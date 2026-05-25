@@ -99,15 +99,15 @@ export default function SalesPage() {
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6">
         <Stat label="Total período (USD)" value={formatUSD(stats.totalUSD)} accent />
         <Stat label="Total período (Bs)" value={formatBs(stats.totalBs)} />
         <Stat label="Transacciones" value={stats.count} />
       </div>
 
       <Card>
-        <div className="px-5 py-4 border-b border-border flex gap-3 items-center">
-          <span className="text-xs uppercase tracking-wider text-text-secondary">Filtrar por canal</span>
+        <div className="px-4 sm:px-5 py-4 border-b border-border flex gap-3 items-center flex-wrap">
+          <span className="text-xs uppercase tracking-wider text-text-secondary whitespace-nowrap">Filtrar por canal</span>
           <Select
             value={channelFilter}
             onChange={(e) => setChannelFilter(e.target.value)}
