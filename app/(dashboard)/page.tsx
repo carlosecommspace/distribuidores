@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { Stat } from '@/components/ui/Stat'
 import { Card, CardHeader, CardTitle, CardBody } from '@/components/ui/Card'
@@ -11,7 +12,8 @@ import { RevenueChart } from '@/components/analytics/RevenueChart'
 
 export default async function DashboardPage() {
   const session = await auth()
-  const userId = (session!.user as { id: string }).id
+  if (!session?.user) redirect('/login')
+  const userId = (session.user as { id: string }).id
 
   const startOfDay = new Date()
   startOfDay.setHours(0, 0, 0, 0)
