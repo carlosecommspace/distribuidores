@@ -13,13 +13,13 @@ interface Props {
 
 export function Stat({ label, value, hint, delta, icon, accent, className }: Props) {
   return (
-    <div className={cn('bg-surface border border-border rounded-lg p-5', accent && 'border-accent-border bg-accent-subtle', className)}>
+    <div className={cn('bg-surface border border-border rounded-lg p-4 md:p-5', accent && 'border-accent-border bg-accent-subtle', className)}>
       <div className="flex items-start justify-between mb-3">
         <span className="text-[11px] uppercase tracking-wider text-text-secondary font-medium">{label}</span>
         {icon && <span className={cn('text-text-muted', accent && 'text-accent')}>{icon}</span>}
       </div>
       <div className="flex items-baseline gap-3">
-        <span className={cn('font-mono text-2xl font-medium', accent ? 'text-accent' : 'text-text-primary')}>{value}</span>
+        <span className={cn('font-mono text-xl md:text-2xl font-medium', accent ? 'text-accent' : 'text-text-primary')}>{value}</span>
         {delta && (
           <span
             className={cn(

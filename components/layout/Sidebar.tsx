@@ -25,18 +25,23 @@ const nav = [
   { href: '/settings', label: 'Configuración', icon: Settings },
 ]
 
-export function Sidebar({ user }: { user: { name?: string | null; email: string } }) {
+interface Props {
+  user: { name?: string | null; email: string }
+  onNavigate?: () => void
+}
+
+export function Sidebar({ user, onNavigate }: Props) {
   const pathname = usePathname()
   return (
-    <aside className="hidden md:flex flex-col w-[240px] bg-surface border-r border-border h-screen sticky top-0">
+    <aside className="flex flex-col w-[260px] bg-surface border-r border-border h-screen">
       <div className="px-6 py-6 border-b border-border">
-        <Link href="/" className="flex items-baseline gap-1.5">
+        <Link href="/" onClick={onNavigate} className="flex items-baseline gap-1.5">
           <span className="font-display font-bold text-xl text-text-primary">Distrib</span>
           <span className="font-display font-bold text-xl text-accent">OS</span>
         </Link>
         <div className="text-[11px] text-text-muted mt-1 uppercase tracking-wider">Sistema operativo</div>
       </div>
-      <nav className="flex-1 py-4 px-3 flex flex-col gap-0.5">
+      <nav className="flex-1 py-4 px-3 flex flex-col gap-0.5 overflow-y-auto">
         {nav.map((item) => {
           const Icon = item.icon
           const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
@@ -44,8 +49,9 @@ export function Sidebar({ user }: { user: { name?: string | null; email: string 
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors',
                 active
                   ? 'bg-accent-subtle text-accent border border-accent-border'
                   : 'text-text-secondary hover:text-text-primary hover:bg-surface-2 border border-transparent',
@@ -59,7 +65,7 @@ export function Sidebar({ user }: { user: { name?: string | null; email: string 
       </nav>
       <div className="px-3 py-4 border-t border-border">
         <div className="flex items-center gap-3 px-3 py-2">
-          <div className="h-8 w-8 rounded-full bg-accent text-black flex items-center justify-center font-display font-semibold text-sm">
+          <div className="h-8 w-8 rounded-full bg-accent text-black flex items-center justify-center font-display font-semibold text-sm shrink-0">
             {(user.name || user.email).charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">

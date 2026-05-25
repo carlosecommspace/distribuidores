@@ -87,7 +87,7 @@ export default function ClientsPage() {
       />
 
       <Card>
-        <div className="px-5 py-4 border-b border-border flex gap-3">
+        <div className="px-4 sm:px-5 py-4 border-b border-border flex gap-3">
           <div className="relative flex-1 max-w-md">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, empresa o teléfono" className="pl-9" />
