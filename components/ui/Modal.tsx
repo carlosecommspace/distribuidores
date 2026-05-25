@@ -29,19 +29,23 @@ export function Modal({ open, onOpenChange, title, description, children, footer
             sizes[size],
           )}
         >
-          <div className="flex items-start justify-between px-6 py-4 border-b border-border">
-            <div>
-              <Dialog.Title className="font-display text-lg font-semibold text-text-primary">{title}</Dialog.Title>
+          <div className="flex items-start justify-between px-4 sm:px-6 py-4 border-b border-border gap-3">
+            <div className="min-w-0">
+              <Dialog.Title className="font-display text-base sm:text-lg font-semibold text-text-primary truncate">{title}</Dialog.Title>
               {description && (
-                <Dialog.Description className="text-sm text-text-secondary mt-0.5">{description}</Dialog.Description>
+                <Dialog.Description className="text-xs sm:text-sm text-text-secondary mt-0.5">{description}</Dialog.Description>
               )}
             </div>
-            <Dialog.Close className="text-text-muted hover:text-text-primary p-1">
+            <Dialog.Close className="text-text-muted hover:text-text-primary p-1 shrink-0">
               <X size={18} />
             </Dialog.Close>
           </div>
-          <div className="overflow-y-auto px-6 py-5 flex-1">{children}</div>
-          {footer && <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-2">{footer}</div>}
+          <div className="overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 flex-1">{children}</div>
+          {footer && (
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex items-center justify-end gap-2 flex-wrap">
+              {footer}
+            </div>
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

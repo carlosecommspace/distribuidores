@@ -45,7 +45,7 @@ export default function AnalyticsPage() {
         title="Analytics"
         subtitle="Métricas clave de tu operación"
         actions={
-          <div className="flex items-center gap-1 p-1 bg-surface-2 border border-border rounded-md">
+          <div className="flex items-center gap-1 p-1 bg-surface-2 border border-border rounded-md overflow-x-auto">
             {[
               { v: 'today', l: 'Hoy' },
               { v: '7d', l: '7 días' },
@@ -55,7 +55,7 @@ export default function AnalyticsPage() {
               <button
                 key={p.v}
                 onClick={() => setPeriod(p.v)}
-                className={cn('px-3 py-1.5 text-xs rounded', period === p.v ? 'bg-accent text-black' : 'text-text-secondary hover:text-text-primary')}
+                className={cn('px-3 py-1.5 text-xs rounded whitespace-nowrap', period === p.v ? 'bg-accent text-black' : 'text-text-secondary hover:text-text-primary')}
               >
                 {p.l}
               </button>
@@ -65,12 +65,12 @@ export default function AnalyticsPage() {
       />
 
       {!data ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
             <Stat label="Ingresos USD" value={formatUSD(data.totalUSD)} accent />
             <Stat label="Ingresos Bs" value={formatBs(data.totalBs)} />
             <Stat label="Transacciones" value={data.transactions} />
@@ -82,7 +82,7 @@ export default function AnalyticsPage() {
             <CardBody><RevenueChart data={data.daily.map((d) => ({ date: d.date.slice(5), usd: d.usd }))} /></CardBody>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
             <Card>
               <CardHeader><CardTitle>Ventas por canal</CardTitle></CardHeader>
               <CardBody>
@@ -129,7 +129,7 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
             <Card>
               <CardHeader><CardTitle>Top productos</CardTitle></CardHeader>
               <CardBody className="p-0">
@@ -166,7 +166,7 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
             <Card className="lg:col-span-2">
               <CardHeader><CardTitle>Productos bajo stock mínimo</CardTitle></CardHeader>
               <CardBody className="p-0">
@@ -192,7 +192,7 @@ export default function AnalyticsPage() {
             <Card>
               <CardHeader><CardTitle>Valor del inventario</CardTitle></CardHeader>
               <CardBody>
-                <div className="font-mono text-3xl text-accent">{formatUSD(data.inventoryValue)}</div>
+                <div className="font-mono text-2xl md:text-3xl text-accent">{formatUSD(data.inventoryValue)}</div>
                 <div className="text-xs text-text-muted mt-1">Costo total de stock activo</div>
                 <div className="mt-5 text-xs uppercase tracking-wider text-text-secondary mb-2">Sin movimiento en 30 días</div>
                 <ul className="text-sm flex flex-col gap-1">

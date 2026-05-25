@@ -122,8 +122,8 @@ export default function InventoryPage() {
       />
 
       <Card>
-        <div className="px-5 py-4 border-b border-border flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[220px]">
+        <div className="px-4 sm:px-5 py-4 border-b border-border flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[180px] sm:min-w-[220px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <Input
               value={q}
@@ -132,7 +132,7 @@ export default function InventoryPage() {
               className="pl-9"
             />
           </div>
-          <div className="flex items-center gap-1 p-1 bg-surface-2 border border-border rounded-md">
+          <div className="flex items-center gap-1 p-1 bg-surface-2 border border-border rounded-md overflow-x-auto">
             {[
               { v: 'all', l: 'Todos' },
               { v: 'low', l: 'Bajo stock' },
@@ -141,7 +141,7 @@ export default function InventoryPage() {
               <button
                 key={f.v}
                 onClick={() => setFilter(f.v as typeof filter)}
-                className={`px-3 py-1 text-xs rounded ${filter === f.v ? 'bg-accent text-black' : 'text-text-secondary hover:text-text-primary'}`}
+                className={`px-3 py-1 text-xs rounded whitespace-nowrap ${filter === f.v ? 'bg-accent text-black' : 'text-text-secondary hover:text-text-primary'}`}
               >
                 {f.l}
               </button>
