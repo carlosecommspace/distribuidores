@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardHeader, CardTitle, CardBody } from '@/components/ui/Card'
@@ -9,7 +10,8 @@ import { Phone, Link as LinkIcon, MessageCircle } from 'lucide-react'
 
 export default async function WhatsappPage() {
   const session = await auth()
-  const userId = (session!.user as { id: string }).id
+  if (!session?.user) redirect('/login')
+  const userId = (session.user as { id: string }).id
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
   const settings = await prisma.settings.findUnique({ where: { userId } })
