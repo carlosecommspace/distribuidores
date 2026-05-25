@@ -4,61 +4,50 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
 const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  company: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  email: z.string().email().optional().nullable().or(z.literal('')),
-  address: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  type: z.enum(['retail', 'wholesale', 'distributor']).optional(),
+  name: z.string().min(1).max(80).optional(),
   notes: z.string().optional().nullable(),
-  priceListId: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
 })
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const userId = (session.user as { id: string }).id
-  const client = await prisma.client.findFirst({
+  const list = await prisma.priceList.findFirst({
     where: { id: params.id, userId },
     include: {
-      sales: { include: { items: { include: { product: true } } }, orderBy: { createdAt: 'desc' } },
-      priceList: true,
-      portalUser: { select: { id: true, email: true, name: true } },
+      items: { include: { product: true }, orderBy: { product: { name: 'asc' } } },
+      clients: { select: { id: true, name: true, company: true } },
     },
   })
-  if (!client) return NextResponse.json({ error: 'not found' }, { status: 404 })
-  return NextResponse.json(client)
+  if (!list) return NextResponse.json({ error: 'not found' }, { status: 404 })
+  return NextResponse.json(list)
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const userId = (session.user as { id: string }).id
-  const existing = await prisma.client.findFirst({ where: { id: params.id, userId } })
+  const existing = await prisma.priceList.findFirst({ where: { id: params.id, userId } })
   if (!existing) return NextResponse.json({ error: 'not found' }, { status: 404 })
   const parsed = updateSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-  const data = parsed.data
-
-  if (data.priceListId) {
-    const ok = await prisma.priceList.findFirst({ where: { id: data.priceListId, userId } })
-    if (!ok) return NextResponse.json({ error: 'price list not found' }, { status: 400 })
+  try {
+    const list = await prisma.priceList.update({ where: { id: params.id }, data: parsed.data })
+    return NextResponse.json(list)
+  } catch (e: unknown) {
+    const code = (e as { code?: string }).code
+    if (code === 'P2002') return NextResponse.json({ error: 'Ya existe una lista con ese nombre' }, { status: 409 })
+    return NextResponse.json({ error: 'error' }, { status: 500 })
   }
-
-  const client = await prisma.client.update({
-    where: { id: params.id },
-    data: { ...data, email: data.email === '' ? null : data.email },
-  })
-  return NextResponse.json(client)
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const userId = (session.user as { id: string }).id
-  const existing = await prisma.client.findFirst({ where: { id: params.id, userId } })
+  const existing = await prisma.priceList.findFirst({ where: { id: params.id, userId } })
   if (!existing) return NextResponse.json({ error: 'not found' }, { status: 404 })
-  await prisma.client.delete({ where: { id: params.id } })
+  await prisma.priceList.delete({ where: { id: params.id } })
   return NextResponse.json({ ok: true })
 }
