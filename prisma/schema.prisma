@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  password     String?
+  company      String?
+  phone        String?
+  slug         String?       @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  products     Product[]
+  clients      Client[]
+  sales        Sale[]
+  mlConnection MLConnection?
+  settings     Settings?
+}
+
+model Settings {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  exchangeRate    Float     @default(0)
+  autoUpdateRate  Boolean   @default(true)
+  lastRateUpdate  DateTime?
+
+  defaultMargin   Float     @default(0.15)
+
+  waPhoneNumber   String?
+  waApiToken      String?
+  waWebhookSecret String?
+
+  mlAutoAnswer    Boolean   @default(false)
+  mlAutoSync      Boolean   @default(true)
+  mlSyncInterval  Int       @default(60)
+
+  notifLowStock   Boolean   @default(true)
+  notifNewQuestion Boolean  @default(true)
+  notifNewSale    Boolean   @default(false)
+
+  updatedAt       DateTime  @updatedAt
+}
+
+model Product {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sku           String
+  name          String
+  description   String?
+  category      String?
+  brand         String?
+  unit          String       @default("unidad")
+  images        String[]
+
+  costUSD       Float        @default(0)
+  priceUSD      Float
+  priceBs       Float        @default(0)
+  marginPercent Float        @default(0)
+
+  stock         Int          @default(0)
+  stockMin      Int          @default(5)
+  stockMax      Int?
+
+  mlItemId      String?
+  mlStatus      String?
+  mlCategoryId  String?
+  mlListingType String       @default("gold_special")
+  mlSyncEnabled Boolean      @default(false)
+  mlLastSync    DateTime?
+
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  saleItems     SaleItem[]
+  mlQuestions   MLQuestion[]
+
+  @@unique([userId, sku])
+  @@index([userId])
+}
+
+model Client {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name           String
+  company        String?
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  type           String    @default("retail")
+  notes          String?
+
+  totalPurchases Float     @default(0)
+  lastPurchase   DateTime?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sales          Sale[]
+
+  @@index([userId])
+}
+
+model Sale {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId      String?
+  client        Client?    @relation(fields: [clientId], references: [id])
+
+  channel       String
+  mlOrderId     String?
+
+  subtotalUSD   Float
+  totalUSD      Float
+  totalBs       Float      @default(0)
+  exchangeRate  Float
+
+  paymentMethod String     @default("cash_usd")
+  paymentStatus String     @default("paid")
+
+  notes         String?
+  status        String     @default("completed")
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  items         SaleItem[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model SaleItem {
+  id          String  @id @default(cuid())
+  saleId      String
+  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+
+  quantity    Int
+  priceUSD    Float
+  subtotalUSD Float
+}
+
+model MLConnection {
+  id           String       @id @default(cuid())
+  userId       String       @unique
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  mlUserId     String
+  accessToken  String
+  refreshToken String
+  tokenExpiry  DateTime
+  siteId       String       @default("MLV")
+
+  isActive     Boolean      @default(true)
+  connectedAt  DateTime     @default(now())
+  lastSync     DateTime?
+
+  questions    MLQuestion[]
+}
+
+model MLQuestion {
+  id            String       @id @default(cuid())
+  mlQuestionId  String       @unique
+  connectionId  String
+  connection    MLConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product?     @relation(fields: [productId], references: [id])
+
+  mlItemId      String
+  questionText  String
+  buyerNickname String?
+  status        String       @default("unanswered")
+
+  answerText    String?
+  answeredAt    DateTime?
+  answeredBy    String?
+  aiSuggestion  String?
+
+  createdAt     DateTime     @default(now())
+
+  @@index([connectionId, status])
+}
+
+model ExchangeRateLog {
+  id        String   @id @default(cuid())
+  rate      Float
+  source    String   @default("bcv")
+  createdAt DateTime @default(now())
+}
+
+model QuickReply {
+  id        String   @id @default(cuid())
+  userId    String
+  trigger   String
+  reply     String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
