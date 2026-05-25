@@ -1,5 +1,5 @@
-import bcrypt from 'bcryptjs'
-import { PrismaClient } from '@prisma/client'
+const bcrypt = require('bcryptjs')
+const { PrismaClient } = require('@prisma/client')
 
 const prisma = new PrismaClient()
 
@@ -16,13 +16,12 @@ async function main() {
     create: { email, password: hash, name },
   })
 
-  console.log(`✓ User ready: ${user.email} (id=${user.id})`)
-  console.log(`  password: ${password}`)
+  console.log(`[create-user] ready: ${user.email} (id=${user.id})`)
 }
 
 main()
   .catch((e) => {
-    console.error(e)
+    console.error('[create-user] failed:', e)
     process.exit(1)
   })
   .finally(() => prisma.$disconnect())
