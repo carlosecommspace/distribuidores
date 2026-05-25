@@ -18,9 +18,15 @@ model User {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
+  role         String        @default("admin")
+  clientId     String?       @unique
+  clientLink   Client?       @relation("ClientPortalUser", fields: [clientId], references: [id], onDelete: SetNull)
+
   products     Product[]
   clients      Client[]
   sales        Sale[]
+  priceLists   PriceList[]
+  requests     ProductRequest[]
   mlConnection MLConnection?
   settings     Settings?
 }
@@ -86,6 +92,8 @@ model Product {
 
   saleItems     SaleItem[]
   mlQuestions   MLQuestion[]
+  priceListItems PriceListItem[]
+  requestItems  ProductRequestItem[]
 
   @@unique([userId, sku])
   @@index([userId])
@@ -108,12 +116,88 @@ model Client {
   totalPurchases Float     @default(0)
   lastPurchase   DateTime?
 
+  priceListId    String?
+  priceList      PriceList? @relation(fields: [priceListId], references: [id], onDelete: SetNull)
+
+  portalUser     User?     @relation("ClientPortalUser")
+  requests       ProductRequest[]
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   sales          Sale[]
 
   @@index([userId])
+}
+
+model PriceList {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  notes     String?
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     PriceListItem[]
+  clients   Client[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model PriceListItem {
+  id          String    @id @default(cuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  priceUSD    Float
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([priceListId, productId])
+  @@index([productId])
+}
+
+model ProductRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  status      String   @default("pending")
+  notes       String?
+  totalUSD    Float    @default(0)
+
+  fulfilledAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       ProductRequestItem[]
+
+  @@index([userId, status])
+  @@index([clientId])
+  @@index([createdAt])
+}
+
+model ProductRequestItem {
+  id          String         @id @default(cuid())
+  requestId   String
+  request     ProductRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product        @relation(fields: [productId], references: [id])
+
+  quantity    Int
+  priceUSD    Float
+  subtotalUSD Float
 }
 
 model Sale {
