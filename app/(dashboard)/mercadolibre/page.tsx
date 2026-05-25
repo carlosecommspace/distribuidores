@@ -1,4 +1,5 @@
 import { auth } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardHeader, CardTitle, CardBody } from '@/components/ui/Card'
@@ -13,7 +14,8 @@ import { formatUSD, formatRelative } from '@/lib/utils'
 
 export default async function MLPage() {
   const session = await auth()
-  const userId = (session!.user as { id: string }).id
+  if (!session?.user) redirect('/login')
+  const userId = (session.user as { id: string }).id
 
   const conn = await prisma.mLConnection.findUnique({ where: { userId } })
 
