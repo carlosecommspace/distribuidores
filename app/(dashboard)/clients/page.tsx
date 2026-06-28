@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { toast } from '@/components/ui/Toast'
 import { formatUSD, formatRelative } from '@/lib/utils'
-import { Plus, Search, Users } from 'lucide-react'
+import { Plus, Search, Users, Tag } from 'lucide-react'
 
 interface Client {
   id: string
@@ -24,6 +24,14 @@ interface Client {
   type: string
   totalPurchases: number
   lastPurchase?: string | null
+  priceListId?: string | null
+  priceList?: { id: string; name: string } | null
+}
+
+interface PriceList {
+  id: string
+  name: string
+  isActive: boolean
 }
 
 export default function ClientsPage() {
@@ -41,7 +49,9 @@ export default function ClientsPage() {
     city: '',
     type: 'retail',
     notes: '',
+    priceListId: '',
   })
+  const [priceLists, setPriceLists] = useState<PriceList[]>([])
 
   const load = async () => {
     setLoading(true)
@@ -50,7 +60,12 @@ export default function ClientsPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    fetch('/api/price-lists').then((r) => r.json()).then((d) => {
+      setPriceLists((d as PriceList[]).filter((l) => l.isActive))
+    }).catch(() => setPriceLists([]))
+  }, [])
   useEffect(() => {
     const t = setTimeout(load, 300)
     return () => clearTimeout(t)
@@ -61,16 +76,17 @@ export default function ClientsPage() {
     const r = await fetch('/api/clients', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, priceListId: form.priceListId || null }),
     })
     setSaving(false)
     if (!r.ok) {
-      toast.error('Error guardando cliente')
+      const e = await r.json().catch(() => ({}))
+      toast.error(typeof e.error === 'string' ? e.error : 'Error guardando cliente')
       return
     }
     toast.success('Cliente creado')
     setOpen(false)
-    setForm({ name: '', company: '', phone: '', email: '', address: '', city: '', type: 'retail', notes: '' })
+    setForm({ name: '', company: '', phone: '', email: '', address: '', city: '', type: 'retail', notes: '', priceListId: '' })
     load()
   }
 
@@ -111,6 +127,7 @@ export default function ClientsPage() {
                   <TH>Empresa</TH>
                   <TH>Teléfono</TH>
                   <TH>Tipo</TH>
+                  <TH>Lista de precio</TH>
                   <TH className="text-right">Total comprado</TH>
                   <TH>Última compra</TH>
                 </TR>
@@ -124,6 +141,13 @@ export default function ClientsPage() {
                     <TD className="text-text-secondary">{c.company || '—'}</TD>
                     <TD className="font-mono text-text-secondary">{c.phone || '—'}</TD>
                     <TD>{typeBadge(c.type)}</TD>
+                    <TD>
+                      {c.priceList ? (
+                        <Badge tone="accent"><Tag size={10} /> {c.priceList.name}</Badge>
+                      ) : (
+                        <span className="text-xs text-text-muted">Precio base</span>
+                      )}
+                    </TD>
                     <TD className="text-right font-mono">{formatUSD(c.totalPurchases)}</TD>
                     <TD className="text-text-secondary text-xs">{c.lastPurchase ? formatRelative(c.lastPurchase) : '—'}</TD>
                   </TR>
@@ -161,6 +185,15 @@ export default function ClientsPage() {
               { value: 'retail', label: 'Detal' },
               { value: 'wholesale', label: 'Mayorista' },
               { value: 'distributor', label: 'Distribuidor' },
+            ]}
+          />
+          <Select
+            label="Lista de precio (acuerdo)"
+            value={form.priceListId}
+            onChange={(e) => setForm({ ...form, priceListId: e.target.value })}
+            options={[
+              { value: '', label: 'Precio base — sin lista' },
+              ...priceLists.map((l) => ({ value: l.id, label: l.name })),
             ]}
           />
           <Textarea label="Notas internas" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="md:col-span-2" />
