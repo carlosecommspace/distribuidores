@@ -29,10 +29,23 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const costUSD = body.costUSD ?? current.costUSD
   const margin = costUSD > 0 ? ((priceUSD - costUSD) / costUSD) * 100 : 0
 
+  // Si vino categoryId distinto, sincroniza el nombre denormalizado
+  const patch: Record<string, unknown> = { ...body }
+  if ('categoryId' in body) {
+    if (body.categoryId) {
+      const cat = await prisma.category.findFirst({ where: { id: body.categoryId, userId } })
+      if (!cat) return NextResponse.json({ error: 'Categoría no encontrada' }, { status: 400 })
+      patch.category = cat.name
+      patch.categoryId = cat.id
+    } else {
+      patch.categoryId = null
+    }
+  }
+
   const product = await prisma.product.update({
     where: { id: params.id },
     data: {
-      ...body,
+      ...patch,
       priceBs: priceUSD * rate,
       marginPercent: margin,
     },

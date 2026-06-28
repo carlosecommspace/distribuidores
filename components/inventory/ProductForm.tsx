@@ -1,14 +1,23 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
+import Link from 'next/link'
+
+interface CategoryOption {
+  id: string
+  name: string
+  parentId?: string | null
+  parent?: { name: string } | null
+}
 
 export interface ProductFormValues {
   sku: string
   name: string
   description: string
   category: string
+  categoryId: string
   brand: string
   unit: string
   costUSD: number
@@ -28,6 +37,7 @@ export const emptyProduct: ProductFormValues = {
   name: '',
   description: '',
   category: '',
+  categoryId: '',
   brand: '',
   unit: 'unidad',
   costUSD: 0,
@@ -52,9 +62,22 @@ export function ProductForm({
   rate: number
 }) {
   const [imgInput, setImgInput] = useState('')
+  const [categories, setCategories] = useState<CategoryOption[]>([])
   const set = <K extends keyof ProductFormValues>(k: K, v: ProductFormValues[K]) => onChange({ ...value, [k]: v })
   const margin = value.costUSD > 0 ? ((value.priceUSD - value.costUSD) / value.costUSD) * 100 : 0
   const priceBs = value.priceUSD * rate
+
+  useEffect(() => {
+    fetch('/api/categories').then((r) => r.json()).then(setCategories).catch(() => setCategories([]))
+  }, [])
+
+  const categoryOptions = [
+    { value: '', label: '— Sin categoría —' },
+    ...categories.map((c) => ({
+      value: c.id,
+      label: c.parent ? `${c.parent.name} / ${c.name}` : c.name,
+    })),
+  ]
 
   return (
     <div className="flex flex-col gap-7">
@@ -67,7 +90,24 @@ export function ProductForm({
           value={value.description}
           onChange={(e) => set('description', e.target.value)}
         />
-        <Input label="Categoría" value={value.category} onChange={(e) => set('category', e.target.value)} />
+        <div className="flex flex-col gap-1.5">
+          <Select
+            label="Categoría"
+            value={value.categoryId}
+            onChange={(e) => {
+              const id = e.target.value
+              const cat = categories.find((c) => c.id === id)
+              onChange({ ...value, categoryId: id, category: cat?.name || '' })
+            }}
+            options={categoryOptions}
+          />
+          {categories.length === 0 && (
+            <span className="text-xs text-text-muted">
+              No hay categorías —{' '}
+              <Link href="/categories" className="text-accent hover:underline">crea o importa</Link> tu primera.
+            </span>
+          )}
+        </div>
         <Input label="Marca" value={value.brand} onChange={(e) => set('brand', e.target.value)} />
         <Select
           label="Unidad"
