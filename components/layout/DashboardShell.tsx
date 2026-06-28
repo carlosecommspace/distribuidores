@@ -7,10 +7,11 @@ import { Topbar } from './Topbar'
 interface Props {
   user: { name?: string | null; email: string }
   initialRate: number
+  initialCurrency?: 'USD' | 'EUR'
   children: React.ReactNode
 }
 
-export function DashboardShell({ user, initialRate, children }: Props) {
+export function DashboardShell({ user, initialRate, initialCurrency = 'USD', children }: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -33,7 +34,7 @@ export function DashboardShell({ user, initialRate, children }: Props) {
       </Dialog.Root>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <Topbar initialRate={initialRate} onMenuClick={() => setOpen(true)} />
+        <Topbar initialRate={initialRate} initialCurrency={initialCurrency} onMenuClick={() => setOpen(true)} />
         <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-[1600px] w-full">{children}</main>
       </div>
     </div>

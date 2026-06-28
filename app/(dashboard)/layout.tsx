@@ -16,9 +16,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!user) redirect('/login')
 
+  const primaryCurrency = (settings?.primaryCurrency === 'EUR' ? 'EUR' : 'USD') as 'USD' | 'EUR'
+  const initialRate = primaryCurrency === 'EUR'
+    ? settings?.eurExchangeRate || 0
+    : settings?.exchangeRate || 0
+
   return (
     <>
-      <DashboardShell user={user} initialRate={settings?.exchangeRate || 0}>
+      <DashboardShell user={user} initialRate={initialRate} initialCurrency={primaryCurrency}>
         {children}
       </DashboardShell>
       <ToastViewport />
