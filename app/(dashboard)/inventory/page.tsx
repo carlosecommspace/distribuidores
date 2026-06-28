@@ -12,8 +12,9 @@ import { StockBadge, MLStatusBadge } from '@/components/inventory/StockBadge'
 import { ProductForm, emptyProduct, type ProductFormValues } from '@/components/inventory/ProductForm'
 import { formatUSD, formatBs, formatNumber } from '@/lib/utils'
 import { toast } from '@/components/ui/Toast'
-import { Plus, Search, Package, Pencil } from 'lucide-react'
+import { Plus, Search, Package, Pencil, Upload, Download } from 'lucide-react'
 import Link from 'next/link'
+import { ImportProductsModal } from '@/components/inventory/ImportProductsModal'
 
 interface Product {
   id: string
@@ -39,6 +40,7 @@ export default function InventoryPage() {
   const [form, setForm] = useState<ProductFormValues>(emptyProduct)
   const [rate, setRate] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -116,9 +118,17 @@ export default function InventoryPage() {
         title="Inventario"
         subtitle={`${items.length} productos · ${formatNumber(items.reduce((s, p) => s + p.stock, 0))} unidades en stock`}
         actions={
-          <Button onClick={() => { setEditingId(null); setForm(emptyProduct); setOpen(true) }}>
-            <Plus size={16} /> Nuevo producto
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <a href="/api/inventory/template" download>
+              <Button variant="ghost"><Download size={14} /> Plantilla</Button>
+            </a>
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              <Upload size={14} /> Importar
+            </Button>
+            <Button onClick={() => { setEditingId(null); setForm(emptyProduct); setOpen(true) }}>
+              <Plus size={16} /> Nuevo producto
+            </Button>
+          </div>
         }
       />
 
@@ -159,11 +169,16 @@ export default function InventoryPage() {
             <EmptyState
               icon={<Package size={32} />}
               title="No hay productos"
-              description="Crea tu primer producto para empezar a llevar el control de tu inventario."
+              description="Crea tu primer producto manualmente o importa desde una plantilla CSV para cargar tu inventario completo de una vez."
               action={
-                <Button onClick={() => { setEditingId(null); setForm(emptyProduct); setOpen(true) }}>
-                  <Plus size={16} /> Nuevo producto
-                </Button>
+                <div className="flex gap-2 flex-wrap justify-center">
+                  <Button onClick={() => { setEditingId(null); setForm(emptyProduct); setOpen(true) }}>
+                    <Plus size={16} /> Nuevo producto
+                  </Button>
+                  <Button variant="secondary" onClick={() => setImportOpen(true)}>
+                    <Upload size={14} /> Importar CSV
+                  </Button>
+                </div>
               }
             />
           ) : (
@@ -223,6 +238,8 @@ export default function InventoryPage() {
       >
         <ProductForm value={form} onChange={setForm} rate={rate} />
       </Modal>
+
+      <ImportProductsModal open={importOpen} onOpenChange={setImportOpen} onDone={load} />
     </div>
   )
 }
