@@ -21,7 +21,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!current) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
   const settings = await prisma.settings.findUnique({ where: { userId } })
-  const rate = settings?.exchangeRate || 0
+  const rate = settings?.primaryCurrency === 'EUR'
+    ? settings?.eurExchangeRate || 0
+    : settings?.exchangeRate || 0
 
   const priceUSD = body.priceUSD ?? current.priceUSD
   const costUSD = body.costUSD ?? current.costUSD

@@ -51,7 +51,9 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const settings = await prisma.settings.findUnique({ where: { userId } })
-  const rate = settings?.exchangeRate || 0
+  const rate = settings?.primaryCurrency === 'EUR'
+    ? settings?.eurExchangeRate || 0
+    : settings?.exchangeRate || 0
   const data = parsed.data
   const margin = data.costUSD > 0 ? ((data.priceUSD - data.costUSD) / data.costUSD) * 100 : 0
 

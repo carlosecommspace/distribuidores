@@ -40,6 +40,12 @@ model Settings {
   autoUpdateRate  Boolean   @default(true)
   lastRateUpdate  DateTime?
 
+  eurExchangeRate    Float     @default(0)
+  autoUpdateEurRate  Boolean   @default(true)
+  lastEurRateUpdate  DateTime?
+
+  primaryCurrency String    @default("USD")
+
   defaultMargin   Float     @default(0.15)
 
   waPhoneNumber   String?
@@ -287,7 +293,10 @@ model ExchangeRateLog {
   id        String   @id @default(cuid())
   rate      Float
   source    String   @default("bcv")
+  currency  String   @default("USD")
   createdAt DateTime @default(now())
+
+  @@index([currency, createdAt])
 }
 
 model QuickReply {

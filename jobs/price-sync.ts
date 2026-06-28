@@ -4,21 +4,45 @@ import { fetchBCVRate } from '../lib/bcv'
 import { getValidAccessToken, updateMLItemPrice, updateMLItemStock } from '../lib/ml-api'
 
 async function runOnce() {
-  const rate = await fetchBCVRate()
-  if (rate.rate <= 0) {
-    console.log('[cron] BCV rate unavailable')
-    return
+  const [usdRate, eurRate] = await Promise.all([
+    fetchBCVRate('USD'),
+    fetchBCVRate('EUR'),
+  ])
+
+  if (usdRate.rate > 0) {
+    await prisma.exchangeRateLog.create({
+      data: { rate: usdRate.rate, source: usdRate.source, currency: 'USD' },
+    })
   }
-  await prisma.exchangeRateLog.create({ data: { rate: rate.rate, source: rate.source } })
-  const settingsList = await prisma.settings.findMany({ where: { autoUpdateRate: true } })
+  if (eurRate.rate > 0) {
+    await prisma.exchangeRateLog.create({
+      data: { rate: eurRate.rate, source: eurRate.source, currency: 'EUR' },
+    })
+  }
+
+  const settingsList = await prisma.settings.findMany({
+    where: { OR: [{ autoUpdateRate: true }, { autoUpdateEurRate: true }] },
+  })
 
   for (const s of settingsList) {
     try {
-      await prisma.settings.update({
-        where: { userId: s.userId },
-        data: { exchangeRate: rate.rate, lastRateUpdate: new Date() },
-      })
-      await prisma.$executeRaw`UPDATE "Product" SET "priceBs" = "priceUSD" * ${rate.rate} WHERE "userId" = ${s.userId}`
+      const updates: Record<string, unknown> = {}
+      if (s.autoUpdateRate && usdRate.rate > 0) {
+        updates.exchangeRate = usdRate.rate
+        updates.lastRateUpdate = new Date()
+      }
+      if (s.autoUpdateEurRate && eurRate.rate > 0) {
+        updates.eurExchangeRate = eurRate.rate
+        updates.lastEurRateUpdate = new Date()
+      }
+      if (Object.keys(updates).length === 0) continue
+
+      const updated = await prisma.settings.update({ where: { userId: s.userId }, data: updates })
+      const activeRate =
+        updated.primaryCurrency === 'EUR' ? updated.eurExchangeRate : updated.exchangeRate
+      if (activeRate > 0) {
+        await prisma.$executeRaw`UPDATE "Product" SET "priceBs" = "priceUSD" * ${activeRate} WHERE "userId" = ${s.userId}`
+      }
 
       if (!s.mlAutoSync) continue
       const token = await getValidAccessToken(s.userId)
@@ -40,7 +64,7 @@ async function runOnce() {
       console.error('[cron] user run failed', s.userId, err)
     }
   }
-  console.log('[cron] price-sync done', rate.rate)
+  console.log('[cron] price-sync done · USD', usdRate.rate, '· EUR', eurRate.rate)
 }
 
 if (process.env.CRON_RUN_ONCE) {
