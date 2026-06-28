@@ -62,6 +62,7 @@ export async function POST(req: Request) {
   const catBySlug = new Map(categories.map((c) => [c.slug, c]))
 
   const stats = { created: 0, updated: 0, skipped: 0, errors: [] as Array<{ row: number; error: string }> }
+  const affectedProductIds: string[] = []
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i]
@@ -114,16 +115,33 @@ export async function POST(req: Request) {
 
     try {
       const existing = await prisma.product.findUnique({ where: { userId_sku: { userId, sku } } })
+      let productId: string
       if (existing) {
-        await prisma.product.update({ where: { id: existing.id }, data })
+        const updated = await prisma.product.update({ where: { id: existing.id }, data })
+        productId = updated.id
         stats.updated++
       } else {
-        await prisma.product.create({ data: { ...data, userId, sku } })
+        const created = await prisma.product.create({ data: { ...data, userId, sku } })
+        productId = created.id
         stats.created++
       }
+      affectedProductIds.push(productId)
     } catch (e: unknown) {
       stats.errors.push({ row: rowIdx, error: e instanceof Error ? e.message : 'error' })
     }
+  }
+
+  // Evaluar stock bajo en cada producto importado/actualizado
+  try {
+    const { checkLowStock, resolveLowStockIfHealthy } = await import('@/lib/notifications')
+    await Promise.all(
+      affectedProductIds.map(async (id) => {
+        await checkLowStock(userId, id)
+        await resolveLowStockIfHealthy(userId, id)
+      }),
+    )
+  } catch (err) {
+    console.error('low-stock check failed (import)', err)
   }
 
   return NextResponse.json(stats)

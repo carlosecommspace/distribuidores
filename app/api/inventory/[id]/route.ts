@@ -50,6 +50,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       marginPercent: margin,
     },
   })
+
+  // Reevaluar notificación de stock bajo si cambió stock/stockMin
+  if ('stock' in body || 'stockMin' in body) {
+    try {
+      const { checkLowStock, resolveLowStockIfHealthy } = await import('@/lib/notifications')
+      await checkLowStock(userId, product.id)
+      await resolveLowStockIfHealthy(userId, product.id)
+    } catch (err) {
+      console.error('low-stock check failed', err)
+    }
+  }
+
   return NextResponse.json(product)
 }
 
