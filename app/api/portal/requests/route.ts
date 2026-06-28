@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireClientSession } from '@/lib/portal'
 import { z } from 'zod'
+import { notify } from '@/lib/notifications'
 
 const itemSchema = z.object({
   productId: z.string().min(1),
@@ -71,5 +72,18 @@ export async function POST(req: Request) {
     },
     include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } } },
   })
+
+  await notify({
+    userId: ctx.ownerId,
+    type: 'new_request',
+    severity: 'info',
+    title: `Nuevo pedido de ${ctx.client.name}`,
+    body: `${lineItems.length} ${lineItems.length === 1 ? 'producto' : 'productos'} · Total $${totalUSD.toFixed(2)} USD`,
+    link: `/requests/${created.id}`,
+    resourceType: 'request',
+    resourceId: created.id,
+    dedup: false,
+  })
+
   return NextResponse.json(created)
 }

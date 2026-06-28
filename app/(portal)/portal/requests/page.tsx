@@ -20,9 +20,10 @@ interface ReqItem {
 }
 interface PortalRequest {
   id: string
-  status: 'pending' | 'fulfilled' | 'cancelled'
+  status: string
   notes?: string | null
   totalUSD: number
+  paidUSD: number
   createdAt: string
   fulfilledAt?: string | null
   items: ReqItem[]
@@ -82,14 +83,18 @@ export default function PortalRequestsPage() {
               </THead>
               <TBody>
                 {items.map((r) => (
-                  <TR key={r.id} className="cursor-pointer" onClick={() => setOpen(r)}>
+                  <TR key={r.id}>
                     <TD className="text-xs text-text-secondary">{formatRelative(r.createdAt)}</TD>
                     <TD className="text-right text-xs">
                       {r.items.length} · {r.items.reduce((a, i) => a + i.quantity, 0)} unid.
                     </TD>
                     <TD className="text-right font-mono text-accent">{formatUSD(r.totalUSD)}</TD>
                     <TD>{statusBadge(r.status)}</TD>
-                    <TD className="text-right text-xs text-text-muted">Ver →</TD>
+                    <TD className="text-right">
+                      <Link href={`/portal/requests/${r.id}`} className="text-xs text-accent hover:underline">
+                        Ver detalle →
+                      </Link>
+                    </TD>
                   </TR>
                 ))}
               </TBody>
@@ -152,8 +157,10 @@ export default function PortalRequestsPage() {
 }
 
 function statusBadge(s: string) {
-  if (s === 'pending') return <Badge tone="info">Pendiente</Badge>
-  if (s === 'fulfilled') return <Badge tone="success">Atendido</Badge>
+  if (s === 'pending') return <Badge tone="warning">Pendiente pago</Badge>
+  if (s === 'partially_paid') return <Badge tone="info">Pago parcial</Badge>
+  if (s === 'paid') return <Badge tone="success">Pagado</Badge>
+  if (s === 'released' || s === 'fulfilled') return <Badge tone="success">Liberado</Badge>
   if (s === 'cancelled') return <Badge tone="danger">Cancelado</Badge>
   return <Badge>{s}</Badge>
 }
