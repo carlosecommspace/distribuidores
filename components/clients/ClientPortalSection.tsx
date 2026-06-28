@@ -7,7 +7,7 @@ import { Select } from '@/components/ui/Select'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/Toast'
-import { Key, Tag, Trash2 } from 'lucide-react'
+import { Key, Tag, Trash2, RefreshCw } from 'lucide-react'
 
 interface Props {
   clientId: string
@@ -28,6 +28,9 @@ export function ClientPortalSection({ clientId, initialPriceListId, portalUser }
   const [form, setForm] = useState({ email: portalUser?.email || '', password: '', name: portalUser?.name || '' })
   const [saving, setSaving] = useState(false)
   const [current, setCurrent] = useState(portalUser)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
     fetch('/api/price-lists').then((r) => r.json()).then(setLists)
@@ -65,6 +68,28 @@ export function ClientPortalSection({ clientId, initialPriceListId, portalUser }
     setCurrent({ id: current?.id || 'new', email: form.email, name: form.name })
     setForm({ ...form, password: '' })
     setOpen(false)
+  }
+
+  const onResetPassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error('Mínimo 6 caracteres')
+      return
+    }
+    setResetting(true)
+    const r = await fetch(`/api/clients/${clientId}/portal/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: newPassword }),
+    })
+    setResetting(false)
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}))
+      toast.error(typeof e.error === 'string' ? e.error : 'Error reseteando contraseña')
+      return
+    }
+    toast.success('Contraseña restablecida — comparte la nueva con el cliente')
+    setNewPassword('')
+    setResetOpen(false)
   }
 
   const onRevoke = async () => {
@@ -113,7 +138,10 @@ export function ClientPortalSection({ clientId, initialPriceListId, portalUser }
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <Button variant="ghost" onClick={() => setOpen(true)}>Cambiar credenciales</Button>
+                  <Button variant="secondary" onClick={() => setResetOpen(true)}>
+                    <RefreshCw size={14} /> Resetear contraseña
+                  </Button>
+                  <Button variant="ghost" onClick={() => setOpen(true)}>Cambiar email</Button>
                   <Button variant="ghost" onClick={onRevoke}>
                     <Trash2 size={14} /> Revocar
                   </Button>
@@ -162,6 +190,31 @@ export function ClientPortalSection({ clientId, initialPriceListId, portalUser }
             label="Nombre (opcional)"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        title="Resetear contraseña del portal"
+        description="Define una nueva contraseña para este cliente. Compártela por canal seguro."
+        size="md"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setResetOpen(false)}>Cancelar</Button>
+            <Button onClick={onResetPassword} loading={resetting}>Resetear</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Nueva contraseña"
+            type="text"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            hint="Mínimo 6 caracteres. El cliente debe cambiarla desde su perfil después de entrar."
+            autoComplete="off"
           />
         </div>
       </Modal>

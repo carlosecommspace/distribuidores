@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
 const patchSchema = z.object({
-  status: z.enum(['pending', 'fulfilled', 'cancelled']),
+  status: z.enum(['pending', 'cancelled']).optional(),
   notes: z.string().optional().nullable(),
 })
 
@@ -17,6 +17,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     include: {
       client: true,
       items: { include: { product: true } },
+      payments: { orderBy: { createdAt: 'desc' } },
+      sale: { select: { id: true, createdAt: true } },
     },
   })
   if (!r) return NextResponse.json({ error: 'not found' }, { status: 404 })
@@ -29,15 +31,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const userId = (session.user as { id: string }).id
   const existing = await prisma.productRequest.findFirst({ where: { id: params.id, userId } })
   if (!existing) return NextResponse.json({ error: 'not found' }, { status: 404 })
+  if (existing.status === 'released') {
+    return NextResponse.json({ error: 'No se puede modificar un pedido liberado' }, { status: 400 })
+  }
   const parsed = patchSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   const { status, notes } = parsed.data
+
   const updated = await prisma.productRequest.update({
     where: { id: params.id },
     data: {
-      status,
-      notes: notes ?? existing.notes,
-      fulfilledAt: status === 'fulfilled' ? new Date() : null,
+      ...(status ? { status, fulfilledAt: null } : {}),
+      ...(notes !== undefined ? { notes } : {}),
     },
   })
   return NextResponse.json(updated)

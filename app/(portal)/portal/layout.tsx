@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import { LogOut, ShoppingBag, Home, History } from 'lucide-react'
+import { LogOut, ShoppingBag, Home, History, User } from 'lucide-react'
 import { ToastViewport } from '@/components/ui/Toast'
 import { PortalNavLink } from '@/components/portal/PortalNavLink'
 
@@ -30,6 +30,7 @@ export default async function PortalLayout({ children }: { children: React.React
             <PortalNavLink href="/portal" icon={<Home size={14} />} label="Inicio" />
             <PortalNavLink href="/portal/catalog" icon={<ShoppingBag size={14} />} label="Catálogo" />
             <PortalNavLink href="/portal/requests" icon={<History size={14} />} label="Mis pedidos" />
+            <PortalNavLink href="/portal/profile" icon={<User size={14} />} label="Mi perfil" />
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden sm:block text-right">

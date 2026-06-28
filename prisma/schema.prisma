@@ -233,19 +233,56 @@ model ProductRequest {
   clientId    String
   client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
+  // status: pending | partially_paid | paid | released | cancelled
   status      String   @default("pending")
   notes       String?
   totalUSD    Float    @default(0)
+  paidUSD     Float    @default(0)
 
   fulfilledAt DateTime?
+  releasedAt  DateTime?
+
+  saleId      String?  @unique
+  sale        Sale?    @relation("RequestRelease", fields: [saleId], references: [id], onDelete: SetNull)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   items       ProductRequestItem[]
+  payments    Payment[]
 
   @@index([userId, status])
   @@index([clientId])
+  @@index([createdAt])
+}
+
+model Payment {
+  id           String   @id @default(cuid())
+  requestId    String
+  request      ProductRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  amountUSD    Float
+  amountBs     Float    @default(0)
+  exchangeRate Float    @default(0)
+
+  // method: cash_usd | cash_bs | zelle | binance | transfer_bs | transfer_usd | other
+  method       String
+  // origin: portal | admin (quién lo registró)
+  origin       String   @default("portal")
+  reference    String?  // últimos 4 dígitos, número de transacción, etc.
+  proofUrl     String?  // URL al comprobante (screenshot, PDF, etc.)
+  note         String?
+
+  // status: submitted | verified | rejected
+  status       String   @default("submitted")
+  verifiedAt   DateTime?
+  verifiedBy   String?
+  rejectedReason String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([requestId, status])
   @@index([createdAt])
 }
 
@@ -286,6 +323,7 @@ model Sale {
   updatedAt     DateTime   @updatedAt
 
   items         SaleItem[]
+  releasedFrom  ProductRequest? @relation("RequestRelease")
 
   @@index([userId])
   @@index([createdAt])
