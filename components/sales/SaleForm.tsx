@@ -6,8 +6,18 @@ import { Button } from '@/components/ui/Button'
 import { formatUSD, formatBs } from '@/lib/utils'
 import { Search, X, Plus } from 'lucide-react'
 
-interface ClientLite { id: string; name: string; company?: string | null; phone?: string | null }
-interface ProductLite { id: string; sku: string; name: string; priceUSD: number; stock: number; unit: string }
+interface ClientLite { id: string; name: string; company?: string | null; phone?: string | null; priceList?: { id: string; name: string } | null }
+interface ProductLite {
+  id: string
+  sku: string
+  name: string
+  priceUSD: number
+  stock: number
+  unit: string
+  effectivePrice?: number
+  hasListPrice?: boolean
+  basePrice?: number
+}
 
 export interface SaleFormValues {
   clientId: string | null
@@ -36,6 +46,7 @@ export function SaleForm({ value, onChange }: { value: SaleFormValues; onChange:
   const [productResults, setProductResults] = useState<ProductLite[]>([])
   const [selectedClient, setSelectedClient] = useState<ClientLite | null>(null)
   const [occasional, setOccasional] = useState(value.clientId === null)
+  const [activePriceListName, setActivePriceListName] = useState<string | null>(null)
 
   useEffect(() => {
     if (occasional) return
@@ -50,17 +61,29 @@ export function SaleForm({ value, onChange }: { value: SaleFormValues; onChange:
   useEffect(() => {
     const t = setTimeout(async () => {
       if (productQuery.length < 1) return setProductResults([])
-      const r = await fetch(`/api/products/search?q=${encodeURIComponent(productQuery)}`)
-      setProductResults(await r.json())
+      const url = new URL('/api/products/search', window.location.origin)
+      url.searchParams.set('q', productQuery)
+      if (value.clientId) url.searchParams.set('clientId', value.clientId)
+      const r = await fetch(url.toString())
+      const data = await r.json()
+      // Backward compat: si la API devuelve array crudo, normalízalo
+      if (Array.isArray(data)) {
+        setProductResults(data)
+        setActivePriceListName(null)
+      } else {
+        setProductResults(data.products || [])
+        setActivePriceListName(data.priceListName || null)
+      }
     }, 200)
     return () => clearTimeout(t)
-  }, [productQuery])
+  }, [productQuery, value.clientId])
 
   const set = <K extends keyof SaleFormValues>(k: K, v: SaleFormValues[K]) => onChange({ ...value, [k]: v })
 
   const addItem = (p: ProductLite) => {
     if (value.items.some((i) => i.productId === p.id)) return
-    set('items', [...value.items, { productId: p.id, name: p.name, sku: p.sku, quantity: 1, priceUSD: p.priceUSD, stock: p.stock }])
+    const unitPrice = p.effectivePrice ?? p.priceUSD
+    set('items', [...value.items, { productId: p.id, name: p.name, sku: p.sku, quantity: 1, priceUSD: unitPrice, stock: p.stock }])
     setProductQuery('')
     setProductResults([])
   }
@@ -145,7 +168,14 @@ export function SaleForm({ value, onChange }: { value: SaleFormValues; onChange:
       </section>
 
       <section>
-        <h4 className="text-xs uppercase tracking-wider text-text-secondary mb-3">2 · Productos</h4>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-xs uppercase tracking-wider text-text-secondary">2 · Productos</h4>
+          {activePriceListName && (
+            <span className="text-[11px] uppercase tracking-wider px-2 py-1 rounded bg-accent-subtle border border-accent-border text-accent">
+              Lista: {activePriceListName}
+            </span>
+          )}
+        </div>
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <Input
@@ -166,7 +196,12 @@ export function SaleForm({ value, onChange }: { value: SaleFormValues; onChange:
                     <div className="text-sm">{p.name}</div>
                     <div className="text-xs text-text-muted font-mono">{p.sku} · stock {p.stock} {p.unit}</div>
                   </div>
-                  <div className="text-sm font-mono text-accent">{formatUSD(p.priceUSD)}</div>
+                  <div className="text-right">
+                    <div className="text-sm font-mono text-accent">{formatUSD(p.effectivePrice ?? p.priceUSD)}</div>
+                    {p.hasListPrice && p.basePrice !== undefined && p.basePrice !== p.effectivePrice && (
+                      <div className="text-[10px] text-text-muted line-through font-mono">{formatUSD(p.basePrice)}</div>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

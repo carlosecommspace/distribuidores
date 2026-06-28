@@ -12,6 +12,7 @@ const clientSchema = z.object({
   city: z.string().optional().nullable(),
   type: z.enum(['retail', 'wholesale', 'distributor']).default('retail'),
   notes: z.string().optional().nullable(),
+  priceListId: z.string().optional().nullable(),
 })
 
 export async function GET(req: Request) {
@@ -32,6 +33,7 @@ export async function GET(req: Request) {
         ],
       }),
     },
+    include: { priceList: { select: { id: true, name: true } } },
     orderBy: { updatedAt: 'desc' },
   })
   return NextResponse.json(clients)
@@ -45,8 +47,19 @@ export async function POST(req: Request) {
   const parsed = clientSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   const data = parsed.data
+
+  if (data.priceListId) {
+    const ok = await prisma.priceList.findFirst({ where: { id: data.priceListId, userId } })
+    if (!ok) return NextResponse.json({ error: 'Lista de precio no encontrada' }, { status: 400 })
+  }
+
   const client = await prisma.client.create({
-    data: { ...data, email: data.email || null, userId },
+    data: {
+      ...data,
+      email: data.email || null,
+      priceListId: data.priceListId || null,
+      userId,
+    },
   })
   return NextResponse.json(client, { status: 201 })
 }

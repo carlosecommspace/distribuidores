@@ -13,7 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
 import { toast } from '@/components/ui/Toast'
 import { formatUSD } from '@/lib/utils'
-import { ArrowLeft, Plus, Trash2, Tag, Search } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Tag, Search, Percent } from 'lucide-react'
 
 interface Item {
   id: string
@@ -48,6 +48,10 @@ export default function PriceListDetailPage() {
   const [selected, setSelected] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkPercent, setBulkPercent] = useState(-10)
+  const [bulkReplace, setBulkReplace] = useState(false)
+  const [bulkApplying, setBulkApplying] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -111,6 +115,24 @@ export default function PriceListDetailPage() {
     else load()
   }
 
+  const onBulkApply = async () => {
+    setBulkApplying(true)
+    const r = await fetch(`/api/price-lists/${params.id}/bulk`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ adjustPercent: bulkPercent, scope: 'all', replace: bulkReplace, roundTo: 2 }),
+    })
+    setBulkApplying(false)
+    if (!r.ok) {
+      toast.error('Error aplicando ajuste')
+      return
+    }
+    const d = await r.json()
+    toast.success(`Aplicado a ${d.applied} productos`)
+    setBulkOpen(false)
+    load()
+  }
+
   const onDeleteList = async () => {
     if (!confirm(`¿Eliminar la lista "${list?.name}"? Esto removerá la asignación de todos los clientes.`)) return
     setDeleting(true)
@@ -137,6 +159,9 @@ export default function PriceListDetailPage() {
         subtitle={list.notes || `${list.items.length} productos · ${list.clients.length} clientes asignados`}
         actions={
           <>
+            <Button variant="secondary" onClick={() => setBulkOpen(true)}>
+              <Percent size={14} /> Generar por %
+            </Button>
             <Button onClick={() => setAddOpen(true)}>
               <Plus size={16} /> Agregar productos
             </Button>
@@ -271,6 +296,63 @@ export default function PriceListDetailPage() {
               })}
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        title="Generar lista por porcentaje"
+        description="Aplica un descuento o recargo sobre el precio base de todos tus productos activos."
+        size="md"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setBulkOpen(false)}>Cancelar</Button>
+            <Button loading={bulkApplying} onClick={onBulkApply}>Aplicar</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="text-xs uppercase tracking-wider text-text-secondary mb-1.5 block">
+              Ajuste porcentual
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                step="0.5"
+                value={bulkPercent}
+                onChange={(e) => setBulkPercent(Number(e.target.value))}
+                className="font-mono text-right"
+              />
+              <span className="text-text-secondary">%</span>
+            </div>
+            <div className="mt-1.5 text-xs text-text-muted">
+              Negativo = descuento (mayoristas).{' '}
+              Positivo = recargo (clientes con sobrecosto). Ej. <span className="font-mono">-10</span> aplica 10% descuento sobre cada producto.
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer text-sm">
+            <input
+              type="checkbox"
+              checked={bulkReplace}
+              onChange={(e) => setBulkReplace(e.target.checked)}
+              className="accent-accent"
+            />
+            <span>
+              Reemplazar precios existentes
+              <span className="block text-xs text-text-muted">
+                Si está activo, borra todos los items previos y aplica desde cero. Si no, solo añade los que faltan y actualiza el resto.
+              </span>
+            </span>
+          </label>
+
+          <div className="bg-surface-2 border border-border rounded-md p-3 text-xs text-text-secondary">
+            <div className="text-text-primary font-medium mb-1">Vista previa</div>
+            Producto base de <span className="font-mono">$10.00</span> →{' '}
+            <span className="font-mono text-accent">${(10 * (1 + bulkPercent / 100)).toFixed(2)}</span>
+          </div>
         </div>
       </Modal>
     </div>
