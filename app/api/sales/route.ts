@@ -104,6 +104,16 @@ export async function POST(req: Request) {
       }
       return sale
     })
+
+    // Tras la venta, evaluar stock bajo en cada producto afectado.
+    // Fuera de la transacción para no bloquearla y porque notify usa dedup.
+    try {
+      const { checkLowStock } = await import('@/lib/notifications')
+      await Promise.all(data.items.map((i) => checkLowStock(userId, i.productId)))
+    } catch (err) {
+      console.error('low-stock check failed', err)
+    }
+
     return NextResponse.json(result, { status: 201 })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'error'

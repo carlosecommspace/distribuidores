@@ -1,6 +1,7 @@
 'use client'
-import { Bell, Calendar, Menu } from 'lucide-react'
+import { Calendar, Menu } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { NotificationsBell } from './NotificationsBell'
 
 interface Props {
   initialRate: number
@@ -55,9 +56,7 @@ export function Topbar({ initialRate, initialCurrency = 'USD', onMenuClick }: Pr
             <span className="text-text-muted text-xs hidden sm:inline"> / {currency}</span>
           </span>
         </div>
-        <button className="text-text-secondary hover:text-text-primary p-1.5 rounded-md hover:bg-surface-2 hidden sm:inline-flex">
-          <Bell size={16} />
-        </button>
+        <NotificationsBell />
       </div>
     </header>
   )
