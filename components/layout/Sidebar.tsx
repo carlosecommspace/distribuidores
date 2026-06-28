@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Package,
+  FolderTree,
   Users,
   Tag,
   Inbox,
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils'
 const nav = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/inventory', label: 'Inventario', icon: Package },
+  { href: '/categories', label: 'Categorías', icon: FolderTree },
   { href: '/clients', label: 'Clientes', icon: Users },
   { href: '/price-lists', label: 'Listas de precio', icon: Tag },
   { href: '/requests', label: 'Pedidos', icon: Inbox },

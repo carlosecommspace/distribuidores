@@ -92,6 +92,7 @@ export default function InventoryPage() {
       name: p.name,
       description: p.description || '',
       category: p.category || '',
+      categoryId: p.categoryId || '',
       brand: p.brand || '',
       unit: p.unit,
       costUSD: p.costUSD,

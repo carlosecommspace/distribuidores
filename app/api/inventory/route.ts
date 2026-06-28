@@ -8,6 +8,7 @@ const productSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().nullable(),
   category: z.string().optional().nullable(),
+  categoryId: z.string().optional().nullable(),
   brand: z.string().optional().nullable(),
   unit: z.string().default('unidad'),
   images: z.array(z.string()).default([]),
@@ -29,13 +30,16 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q') || undefined
   const category = searchParams.get('category') || undefined
+  const categoryId = searchParams.get('categoryId') || undefined
 
   const products = await prisma.product.findMany({
     where: {
       userId,
       ...(q && { OR: [{ name: { contains: q, mode: 'insensitive' } }, { sku: { contains: q, mode: 'insensitive' } }] }),
-      ...(category && { category }),
+      ...(categoryId && { categoryId }),
+      ...(!categoryId && category && { category }),
     },
+    include: { categoryRel: { select: { id: true, name: true, color: true } } },
     orderBy: { updatedAt: 'desc' },
   })
   return NextResponse.json(products)
@@ -57,10 +61,20 @@ export async function POST(req: Request) {
   const data = parsed.data
   const margin = data.costUSD > 0 ? ((data.priceUSD - data.costUSD) / data.costUSD) * 100 : 0
 
+  // Si vino categoryId, denormaliza el nombre a Product.category
+  let categoryName: string | null = data.category ?? null
+  if (data.categoryId) {
+    const cat = await prisma.category.findFirst({ where: { id: data.categoryId, userId } })
+    if (!cat) return NextResponse.json({ error: 'Categoría no encontrada' }, { status: 400 })
+    categoryName = cat.name
+  }
+
   try {
     const product = await prisma.product.create({
       data: {
         ...data,
+        category: categoryName,
+        categoryId: data.categoryId || null,
         userId,
         priceBs: data.priceUSD * rate,
         marginPercent: margin,
