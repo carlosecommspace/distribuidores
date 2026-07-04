@@ -92,10 +92,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
             <CardHeader><CardTitle>Información</CardTitle></CardHeader>
             <CardBody>
               <dl className="flex flex-col gap-3 text-sm">
+                {client.rif && <Row label="RIF / C.I." value={<span className="font-mono">{client.rif}</span>} />}
+                {client.contactPerson && <Row label="Contacto" value={client.contactPerson} />}
                 {client.email && <Row label="Email" value={client.email} />}
                 {client.phone && <Row label="Teléfono" value={client.phone} />}
                 {client.city && <Row label="Ciudad" value={client.city} />}
-                {client.address && <Row label="Dirección" value={client.address} />}
+                {client.address && <Row label="Despacho" value={client.address} />}
+                {client.billingAddress && <Row label="Facturación" value={client.billingAddress} />}
                 <Row label="Tipo" value={client.type} />
               </dl>
               {client.notes && (

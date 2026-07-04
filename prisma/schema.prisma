@@ -206,9 +206,12 @@ model Client {
 
   name           String
   company        String?
+  rif            String?   // RIF, cédula o documento fiscal del cliente
+  contactPerson  String?   // Persona de contacto
   phone          String?
   email          String?
-  address        String?
+  address        String?   // Dirección física / de despacho
+  billingAddress String?   // Dirección de facturación (si difiere)
   city           String?
   type           String    @default("retail")
   notes          String?
@@ -279,6 +282,8 @@ model ProductRequest {
   status      String   @default("pending")
   notes       String?
   totalUSD    Float    @default(0)
+  discountUSD Float    @default(0)  // Descuento aplicado por el admin
+  discountReason String?
   paidUSD     Float    @default(0)
 
   fulfilledAt DateTime?

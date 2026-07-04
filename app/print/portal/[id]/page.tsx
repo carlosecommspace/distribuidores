@@ -41,6 +41,8 @@ export default async function PortalPrintPage({ params }: { params: { id: string
         code: request.code,
         status: request.status,
         totalUSD: request.totalUSD,
+        discountUSD: request.discountUSD,
+        discountReason: request.discountReason,
         paidUSD: request.paidUSD,
         createdAt: request.createdAt.toISOString(),
         releasedAt: request.releasedAt?.toISOString() || null,

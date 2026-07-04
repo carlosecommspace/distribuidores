@@ -15,7 +15,7 @@ import { Stat } from '@/components/ui/Stat'
 import { toast } from '@/components/ui/Toast'
 import { FileUpload } from '@/components/ui/FileUpload'
 import { formatUSD, formatBs, formatDateTime, formatRelative } from '@/lib/utils'
-import { ArrowLeft, CheckCircle, XCircle, Send, Plus, ExternalLink, RotateCcw, Printer } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Send, Plus, ExternalLink, RotateCcw, Printer, Tag } from 'lucide-react'
 
 interface Payment {
   id: string
@@ -39,6 +39,8 @@ interface RequestDetail {
   status: string
   notes?: string | null
   totalUSD: number
+  discountUSD: number
+  discountReason?: string | null
   paidUSD: number
   createdAt: string
   releasedAt?: string | null
@@ -62,6 +64,9 @@ export default function RequestDetailPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [releasing, setReleasing] = useState(false)
+  const [discountOpen, setDiscountOpen] = useState(false)
+  const [discountForm, setDiscountForm] = useState({ amount: '', reason: '' })
+  const [discountSaving, setDiscountSaving] = useState(false)
   const [form, setForm] = useState({
     amountUSD: '',
     method: 'cash_usd',
@@ -135,6 +140,37 @@ export default function RequestDetailPage() {
     load()
   }
 
+  const openDiscount = () => {
+    setDiscountForm({
+      amount: data?.discountUSD && data.discountUSD > 0 ? data.discountUSD.toFixed(2) : '',
+      reason: data?.discountReason || '',
+    })
+    setDiscountOpen(true)
+  }
+
+  const submitDiscount = async () => {
+    const amt = parseFloat(discountForm.amount.replace(',', '.'))
+    if (!Number.isFinite(amt) || amt < 0) {
+      toast.error('Ingresa un monto válido')
+      return
+    }
+    setDiscountSaving(true)
+    const r = await fetch(`/api/requests/${params.id}/discount`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ discountUSD: amt, discountReason: discountForm.reason || null }),
+    })
+    setDiscountSaving(false)
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}))
+      toast.error(typeof e.error === 'string' ? e.error : 'Error aplicando descuento')
+      return
+    }
+    toast.success(amt > 0 ? `Descuento aplicado: $${amt.toFixed(2)}` : 'Descuento removido')
+    setDiscountOpen(false)
+    load()
+  }
+
   const onCancel = async () => {
     if (!confirm('¿Cancelar este pedido? No se podrá modificar después.')) return
     const r = await fetch(`/api/requests/${params.id}`, {
@@ -153,8 +189,10 @@ export default function RequestDetailPage() {
   if (loading) return <Skeleton className="h-64" />
   if (!data) return <div className="text-text-muted">Pedido no encontrado</div>
 
-  const outstanding = Math.max(0, data.totalUSD - data.paidUSD)
+  const effectiveTotal = Math.max(0, data.totalUSD - data.discountUSD)
+  const outstanding = Math.max(0, effectiveTotal - data.paidUSD)
   const canRelease = data.status === 'paid'
+  const canDiscount = data.status !== 'released' && data.status !== 'cancelled'
   const isClosed = data.status === 'released' || data.status === 'cancelled'
 
   return (
@@ -178,6 +216,11 @@ export default function RequestDetailPage() {
             <a href={`/print/admin/${data.id}`} target="_blank" rel="noreferrer">
               <Button variant="secondary"><Printer size={14} /> Imprimir / PDF</Button>
             </a>
+            {canDiscount && (
+              <Button variant="ghost" onClick={openDiscount}>
+                <Tag size={14} /> {data.discountUSD > 0 ? 'Editar descuento' : 'Aplicar descuento'}
+              </Button>
+            )}
             {!isClosed && (
               <>
                 <Button variant="secondary" onClick={() => setAddOpen(true)}>
@@ -196,11 +239,38 @@ export default function RequestDetailPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Stat label="Total del pedido" value={formatUSD(data.totalUSD)} />
+        <Stat
+          label={data.discountUSD > 0 ? 'Total con descuento' : 'Total del pedido'}
+          value={formatUSD(effectiveTotal)}
+          hint={
+            data.discountUSD > 0
+              ? <span className="text-warning">Original: <span className="line-through">{formatUSD(data.totalUSD)}</span> · -{formatUSD(data.discountUSD)}</span>
+              : undefined
+          }
+        />
         <Stat label="Pagado verificado" value={formatUSD(data.paidUSD)} accent={data.paidUSD > 0} />
         <Stat label="Saldo pendiente" value={formatUSD(outstanding)} />
         <Stat label="Pagos registrados" value={data.payments.length} />
       </div>
+
+      {data.discountUSD > 0 && !isClosed && (
+        <Card className="mb-6 border-warning/30 bg-warning-subtle">
+          <CardBody className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-start gap-2">
+              <Tag size={16} className="text-warning mt-0.5" />
+              <div>
+                <div className="text-sm text-warning font-medium">
+                  Descuento aplicado: {formatUSD(data.discountUSD)}
+                </div>
+                {data.discountReason && (
+                  <div className="text-xs text-text-secondary mt-0.5">{data.discountReason}</div>
+                )}
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={openDiscount}>Editar</Button>
+          </CardBody>
+        </Card>
+      )}
 
       {data.saleId && (
         <Card className="mb-6 border-success/30 bg-success-subtle">
@@ -371,6 +441,65 @@ export default function RequestDetailPage() {
             />
             <span>Marcar como verificado de inmediato</span>
           </label>
+        </div>
+      </Modal>
+
+      <Modal
+        open={discountOpen}
+        onOpenChange={setDiscountOpen}
+        title={data.discountUSD > 0 ? 'Editar descuento' : 'Aplicar descuento al pedido'}
+        description="El descuento se resta del total y el cliente ve el saldo pendiente actualizado."
+        size="md"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDiscountOpen(false)}>Cancelar</Button>
+            {data.discountUSD > 0 && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setDiscountForm({ amount: '0', reason: '' })
+                  setTimeout(submitDiscount, 0)
+                }}
+              >
+                Quitar descuento
+              </Button>
+            )}
+            <Button loading={discountSaving} onClick={submitDiscount}>Aplicar</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Monto USD del descuento"
+            type="text"
+            inputMode="decimal"
+            mono
+            value={discountForm.amount}
+            onChange={(e) => setDiscountForm({ ...discountForm, amount: e.target.value })}
+            hint={`Total original: ${formatUSD(data.totalUSD)}. Máximo el total.`}
+            placeholder="0.00"
+          />
+          <div>
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide mb-1.5 block">
+              Razón (opcional)
+            </label>
+            <textarea
+              className="input-base min-h-[80px] resize-y"
+              placeholder="Cliente frecuente, promoción especial, ajuste por error..."
+              value={discountForm.reason}
+              onChange={(e) => setDiscountForm({ ...discountForm, reason: e.target.value })}
+            />
+          </div>
+          {parseFloat(discountForm.amount.replace(',', '.')) > 0 && (
+            <div className="bg-surface-2 border border-border rounded-md p-3 text-xs text-text-secondary">
+              <div className="text-text-primary font-medium mb-1">Resumen</div>
+              Original: <span className="font-mono">{formatUSD(data.totalUSD)}</span> · Descuento:{' '}
+              <span className="font-mono text-warning">−{formatUSD(parseFloat(discountForm.amount.replace(',', '.')) || 0)}</span> · Nuevo total:{' '}
+              <span className="font-mono text-accent">
+                {formatUSD(Math.max(0, data.totalUSD - (parseFloat(discountForm.amount.replace(',', '.')) || 0)))}
+              </span>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

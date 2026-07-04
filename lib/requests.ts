@@ -58,17 +58,21 @@ export async function createRequestWithCode<TData extends { userId: string }>(
 
 /**
  * Recalcula paidUSD y status a partir de los pagos verificados.
+ * Considera el descuento aplicado por el admin: el "total efectivo" a pagar es
+ * (totalUSD - discountUSD).
  * Si el pedido ya está 'released' o 'cancelled', no toca el estado.
  */
 export async function refreshRequestStatus(requestId: string): Promise<{
   paidUSD: number
   totalUSD: number
+  discountUSD: number
+  effectiveTotalUSD: number
   status: RequestStatus
   outstanding: number
 }> {
   const request = await prisma.productRequest.findUnique({
     where: { id: requestId },
-    select: { id: true, status: true, totalUSD: true },
+    select: { id: true, status: true, totalUSD: true, discountUSD: true },
   })
   if (!request) throw new Error('request not found')
 
@@ -77,12 +81,13 @@ export async function refreshRequestStatus(requestId: string): Promise<{
     _sum: { amountUSD: true },
   })
   const paidUSD = sum._sum.amountUSD || 0
-  const outstanding = Math.max(0, request.totalUSD - paidUSD)
+  const effectiveTotalUSD = Math.max(0, request.totalUSD - request.discountUSD)
+  const outstanding = Math.max(0, effectiveTotalUSD - paidUSD)
 
   let nextStatus = request.status as RequestStatus
   if (request.status !== 'released' && request.status !== 'cancelled') {
     if (paidUSD <= 0) nextStatus = 'pending'
-    else if (paidUSD < request.totalUSD - 0.0001) nextStatus = 'partially_paid'
+    else if (paidUSD < effectiveTotalUSD - 0.0001) nextStatus = 'partially_paid'
     else nextStatus = 'paid'
   }
 
@@ -90,5 +95,12 @@ export async function refreshRequestStatus(requestId: string): Promise<{
     where: { id: requestId },
     data: { paidUSD, status: nextStatus },
   })
-  return { paidUSD, totalUSD: request.totalUSD, status: nextStatus, outstanding }
+  return {
+    paidUSD,
+    totalUSD: request.totalUSD,
+    discountUSD: request.discountUSD,
+    effectiveTotalUSD,
+    status: nextStatus,
+    outstanding,
+  }
 }

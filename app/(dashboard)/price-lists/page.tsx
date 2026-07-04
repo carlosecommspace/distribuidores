@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
 import { toast } from '@/components/ui/Toast'
+import { formatUSD, formatDate } from '@/lib/utils'
 import { Plus, Tag, ChevronRight } from 'lucide-react'
 
 interface PriceList {
@@ -19,6 +20,10 @@ interface PriceList {
   notes?: string | null
   isActive: boolean
   _count: { items: number; clients: number }
+  totalListedUSD: number
+  totalBaseUSD: number
+  avgDiscountPercent: number
+  createdAt: string
   updatedAt: string
 }
 
@@ -87,31 +92,45 @@ export default function PriceListsPage() {
               <THead>
                 <TR>
                   <TH>Nombre</TH>
+                  <TH>Creada</TH>
                   <TH className="text-right">Productos</TH>
                   <TH className="text-right">Clientes</TH>
+                  <TH className="text-right">Valor lista</TH>
+                  <TH className="text-right">vs. base</TH>
                   <TH>Estado</TH>
                   <TH></TH>
                 </TR>
               </THead>
               <TBody>
-                {items.map((l) => (
-                  <TR key={l.id}>
-                    <TD>
-                      <Link href={`/price-lists/${l.id}`} className="text-text-primary hover:text-accent">
-                        {l.name}
-                      </Link>
-                      {l.notes && <div className="text-xs text-text-muted truncate max-w-xs">{l.notes}</div>}
-                    </TD>
-                    <TD className="text-right font-mono">{l._count.items}</TD>
-                    <TD className="text-right font-mono">{l._count.clients}</TD>
-                    <TD>{l.isActive ? <Badge tone="success">Activa</Badge> : <Badge>Inactiva</Badge>}</TD>
-                    <TD className="text-right">
-                      <Link href={`/price-lists/${l.id}`} className="text-text-muted hover:text-accent inline-flex p-1">
-                        <ChevronRight size={16} />
-                      </Link>
-                    </TD>
-                  </TR>
-                ))}
+                {items.map((l) => {
+                  const pctSign = l.avgDiscountPercent >= 0 ? '+' : ''
+                  const pctColor = l.avgDiscountPercent > 0 ? 'text-info' : l.avgDiscountPercent < 0 ? 'text-success' : 'text-text-secondary'
+                  return (
+                    <TR key={l.id}>
+                      <TD>
+                        <Link href={`/price-lists/${l.id}`} className="text-text-primary hover:text-accent font-medium">
+                          {l.name}
+                        </Link>
+                        {l.notes && <div className="text-xs text-text-muted truncate max-w-xs">{l.notes}</div>}
+                      </TD>
+                      <TD className="text-xs text-text-secondary">{formatDate(l.createdAt)}</TD>
+                      <TD className="text-right font-mono">{l._count.items}</TD>
+                      <TD className="text-right font-mono">{l._count.clients}</TD>
+                      <TD className="text-right font-mono text-accent">
+                        {l._count.items > 0 ? formatUSD(l.totalListedUSD) : '—'}
+                      </TD>
+                      <TD className={`text-right font-mono ${pctColor}`}>
+                        {l._count.items > 0 ? `${pctSign}${l.avgDiscountPercent.toFixed(1)}%` : '—'}
+                      </TD>
+                      <TD>{l.isActive ? <Badge tone="success">Activa</Badge> : <Badge>Inactiva</Badge>}</TD>
+                      <TD className="text-right">
+                        <Link href={`/price-lists/${l.id}`} className="text-text-muted hover:text-accent inline-flex p-1">
+                          <ChevronRight size={16} />
+                        </Link>
+                      </TD>
+                    </TR>
+                  )
+                })}
               </TBody>
             </Table>
           )}

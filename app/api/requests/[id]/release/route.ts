@@ -48,8 +48,13 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         })
       }
 
-      // Crear Sale enlazada al request
+      // Crear Sale enlazada al request. Considera descuento aplicado.
       const subtotal = request.items.reduce((s, x) => s + x.subtotalUSD, 0)
+      const total = Math.max(0, subtotal - request.discountUSD)
+      const notesBase = `Liberado desde pedido portal ${request.code || request.id}`
+      const notesFull = request.discountUSD > 0
+        ? `${notesBase} · Descuento aplicado: $${request.discountUSD.toFixed(2)}${request.discountReason ? ` (${request.discountReason})` : ''}`
+        : notesBase
       const sale = await tx.sale.create({
         data: {
           userId,
@@ -59,9 +64,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
           paymentStatus: 'paid',
           exchangeRate: rate,
           subtotalUSD: subtotal,
-          totalUSD: subtotal,
-          totalBs: subtotal * rate,
-          notes: `Liberado desde pedido portal ${request.id}`,
+          totalUSD: total,
+          totalBs: total * rate,
+          notes: notesFull,
           items: {
             create: request.items.map((i) => ({
               productId: i.productId,

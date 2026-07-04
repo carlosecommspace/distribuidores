@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/Table'
 import { Modal } from '@/components/ui/Modal'
@@ -13,7 +14,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
 import { toast } from '@/components/ui/Toast'
 import { formatUSD } from '@/lib/utils'
-import { ArrowLeft, Plus, Trash2, Tag, Search, Percent } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Tag, Search, Percent, Pencil } from 'lucide-react'
 
 interface Item {
   id: string
@@ -49,9 +50,15 @@ export default function PriceListDetailPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
-  const [bulkPercent, setBulkPercent] = useState(-10)
+  const [bulkPercentRaw, setBulkPercentRaw] = useState('-10')
   const [bulkReplace, setBulkReplace] = useState(false)
   const [bulkApplying, setBulkApplying] = useState(false)
+  const [bulkScope, setBulkScope] = useState<'all' | 'category'>('all')
+  const [bulkCategoryId, setBulkCategoryId] = useState('')
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; parent?: { name: string } | null }>>([])
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', notes: '', isActive: true })
+  const [editSaving, setEditSaving] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -115,12 +122,44 @@ export default function PriceListDetailPage() {
     else load()
   }
 
+  const openBulk = () => {
+    if (categories.length === 0) {
+      fetch('/api/categories').then((r) => r.json()).then(setCategories).catch(() => setCategories([]))
+    }
+    setBulkOpen(true)
+  }
+
+  const parseBulkPercent = (raw: string): number | null => {
+    const cleaned = raw.replace(',', '.').replace(/[^\d.\-]/g, '')
+    if (!cleaned || cleaned === '-' || cleaned === '.') return null
+    const n = parseFloat(cleaned)
+    if (!Number.isFinite(n)) return null
+    if (n < -95 || n > 500) return null
+    return n
+  }
+
+  const bulkPercentParsed = parseBulkPercent(bulkPercentRaw)
+
   const onBulkApply = async () => {
+    if (bulkPercentParsed === null) {
+      toast.error('Ingresa un porcentaje válido entre -95 y 500')
+      return
+    }
+    if (bulkScope === 'category' && !bulkCategoryId) {
+      toast.error('Selecciona una categoría')
+      return
+    }
     setBulkApplying(true)
     const r = await fetch(`/api/price-lists/${params.id}/bulk`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ adjustPercent: bulkPercent, scope: 'all', replace: bulkReplace, roundTo: 2 }),
+      body: JSON.stringify({
+        adjustPercent: bulkPercentParsed,
+        scope: bulkScope,
+        categoryId: bulkScope === 'category' ? bulkCategoryId : null,
+        replace: bulkReplace,
+        roundTo: 2,
+      }),
     })
     setBulkApplying(false)
     if (!r.ok) {
@@ -128,8 +167,40 @@ export default function PriceListDetailPage() {
       return
     }
     const d = await r.json()
-    toast.success(`Aplicado a ${d.applied} productos`)
+    toast.success(`Aplicado a ${d.applied} producto${d.applied === 1 ? '' : 's'}`)
     setBulkOpen(false)
+    load()
+  }
+
+  const openEdit = () => {
+    if (!list) return
+    setEditForm({ name: list.name, notes: list.notes || '', isActive: list.isActive })
+    setEditOpen(true)
+  }
+
+  const submitEdit = async () => {
+    if (!editForm.name.trim()) {
+      toast.error('El nombre es requerido')
+      return
+    }
+    setEditSaving(true)
+    const r = await fetch(`/api/price-lists/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: editForm.name.trim(),
+        notes: editForm.notes || null,
+        isActive: editForm.isActive,
+      }),
+    })
+    setEditSaving(false)
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}))
+      toast.error(typeof e.error === 'string' ? e.error : 'Error guardando')
+      return
+    }
+    toast.success('Lista actualizada')
+    setEditOpen(false)
     load()
   }
 
@@ -159,7 +230,10 @@ export default function PriceListDetailPage() {
         subtitle={list.notes || `${list.items.length} productos · ${list.clients.length} clientes asignados`}
         actions={
           <>
-            <Button variant="secondary" onClick={() => setBulkOpen(true)}>
+            <Button variant="ghost" onClick={openEdit}>
+              <Pencil size={14} /> Editar
+            </Button>
+            <Button variant="secondary" onClick={openBulk}>
               <Percent size={14} /> Generar por %
             </Button>
             <Button onClick={() => setAddOpen(true)}>
@@ -303,56 +377,166 @@ export default function PriceListDetailPage() {
         open={bulkOpen}
         onOpenChange={setBulkOpen}
         title="Generar lista por porcentaje"
-        description="Aplica un descuento o recargo sobre el precio base de todos tus productos activos."
+        description="Aplica un descuento o recargo sobre el precio base."
         size="md"
         footer={
           <>
             <Button variant="ghost" onClick={() => setBulkOpen(false)}>Cancelar</Button>
-            <Button loading={bulkApplying} onClick={onBulkApply}>Aplicar</Button>
+            <Button loading={bulkApplying} onClick={onBulkApply} disabled={bulkPercentParsed === null}>
+              Aplicar
+            </Button>
           </>
         }
       >
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
+          {/* Ajuste porcentual con presets */}
           <div>
-            <label className="text-xs uppercase tracking-wider text-text-secondary mb-1.5 block">
+            <label className="text-xs uppercase tracking-wider text-text-secondary mb-2 block">
               Ajuste porcentual
             </label>
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {['-5', '-10', '-15', '-20', '-25', '+10'].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setBulkPercentRaw(p.replace('+', ''))}
+                  className={`px-2.5 py-1 text-xs rounded-md border font-mono transition-colors ${
+                    bulkPercentRaw === p.replace('+', '')
+                      ? 'bg-accent text-black border-accent'
+                      : 'bg-surface-2 border-border text-text-secondary hover:bg-surface-3'
+                  }`}
+                >
+                  {p}%
+                </button>
+              ))}
+            </div>
             <div className="flex items-center gap-2">
               <Input
-                type="number"
-                step="0.5"
-                value={bulkPercent}
-                onChange={(e) => setBulkPercent(Number(e.target.value))}
-                className="font-mono text-right"
+                type="text"
+                inputMode="decimal"
+                placeholder="-10"
+                value={bulkPercentRaw}
+                onChange={(e) => setBulkPercentRaw(e.target.value)}
+                className="font-mono text-right text-lg"
               />
-              <span className="text-text-secondary">%</span>
+              <span className="text-text-secondary text-xl">%</span>
             </div>
             <div className="mt-1.5 text-xs text-text-muted">
-              Negativo = descuento (mayoristas).{' '}
-              Positivo = recargo (clientes con sobrecosto). Ej. <span className="font-mono">-10</span> aplica 10% descuento sobre cada producto.
+              Negativo = descuento (mayoristas). Positivo = recargo. Acepta decimales.
             </div>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer text-sm">
+          {/* Scope */}
+          <div>
+            <label className="text-xs uppercase tracking-wider text-text-secondary mb-2 block">
+              Aplicar a
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setBulkScope('all')}
+                className={`p-3 rounded-md border text-sm text-left transition-colors ${
+                  bulkScope === 'all'
+                    ? 'bg-accent-subtle border-accent-border text-accent'
+                    : 'bg-surface-2 border-border text-text-secondary hover:bg-surface-3'
+                }`}
+              >
+                <div className="font-medium">Todos los productos</div>
+                <div className="text-xs opacity-70 mt-0.5">Activos del inventario</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setBulkScope('category')}
+                className={`p-3 rounded-md border text-sm text-left transition-colors ${
+                  bulkScope === 'category'
+                    ? 'bg-accent-subtle border-accent-border text-accent'
+                    : 'bg-surface-2 border-border text-text-secondary hover:bg-surface-3'
+                }`}
+              >
+                <div className="font-medium">Por categoría</div>
+                <div className="text-xs opacity-70 mt-0.5">Solo una categoría</div>
+              </button>
+            </div>
+            {bulkScope === 'category' && (
+              <div className="mt-3">
+                <Select
+                  value={bulkCategoryId}
+                  onChange={(e) => setBulkCategoryId(e.target.value)}
+                  options={[
+                    { value: '', label: '— Elegir categoría —' },
+                    ...categories.map((c) => ({
+                      value: c.id,
+                      label: c.parent ? `${c.parent.name} / ${c.name}` : c.name,
+                    })),
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+
+          <label className="flex items-start gap-2 cursor-pointer text-sm">
             <input
               type="checkbox"
               checked={bulkReplace}
               onChange={(e) => setBulkReplace(e.target.checked)}
-              className="accent-accent"
+              className="accent-accent mt-0.5"
             />
             <span>
               Reemplazar precios existentes
               <span className="block text-xs text-text-muted">
-                Si está activo, borra todos los items previos y aplica desde cero. Si no, solo añade los que faltan y actualiza el resto.
+                Si está activo, borra todos los items previos y aplica desde cero. Si no, sólo actualiza los que estén en el alcance.
               </span>
             </span>
           </label>
 
           <div className="bg-surface-2 border border-border rounded-md p-3 text-xs text-text-secondary">
             <div className="text-text-primary font-medium mb-1">Vista previa</div>
-            Producto base de <span className="font-mono">$10.00</span> →{' '}
-            <span className="font-mono text-accent">${(10 * (1 + bulkPercent / 100)).toFixed(2)}</span>
+            {bulkPercentParsed !== null ? (
+              <>
+                Producto base <span className="font-mono">$10.00</span> →{' '}
+                <span className="font-mono text-accent">${(10 * (1 + bulkPercentParsed / 100)).toFixed(2)}</span>
+              </>
+            ) : (
+              <span className="text-danger">Porcentaje inválido</span>
+            )}
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        title="Editar lista de precio"
+        size="md"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancelar</Button>
+            <Button loading={editSaving} onClick={submitEdit}>Guardar</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Nombre"
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+            required
+          />
+          <textarea
+            className="input-base min-h-[88px] resize-y"
+            placeholder="Notas (opcional)"
+            value={editForm.notes}
+            onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={editForm.isActive}
+              onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
+              className="accent-accent"
+            />
+            <span>Lista activa</span>
+          </label>
         </div>
       </Modal>
     </div>
