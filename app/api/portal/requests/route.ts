@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireClientSession } from '@/lib/portal'
 import { z } from 'zod'
 import { notify } from '@/lib/notifications'
+import { codePrefix, nextRequestCode } from '@/lib/requests'
 
 const itemSchema = z.object({
   productId: z.string().min(1),
@@ -85,23 +86,43 @@ export async function POST(req: Request) {
   })
   const totalUSD = lineItems.reduce((s, x) => s + x.subtotalUSD, 0)
 
-  const created = await prisma.productRequest.create({
-    data: {
-      userId: ctx.ownerId,
-      clientId: ctx.clientId,
-      status: 'pending',
-      notes: notes || null,
-      totalUSD,
-      items: { create: lineItems },
-    },
-    include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+  // Generar código correlativo tipo DIS-001 usando el nombre de la empresa del admin
+  const owner = await prisma.user.findUnique({
+    where: { id: ctx.ownerId },
+    select: { company: true, name: true },
   })
+  const prefix = codePrefix(owner?.company, owner?.name)
+
+  let created: Awaited<ReturnType<typeof prisma.productRequest.create>> | null = null
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = await nextRequestCode(ctx.ownerId, prefix)
+    try {
+      created = await prisma.productRequest.create({
+        data: {
+          userId: ctx.ownerId,
+          clientId: ctx.clientId,
+          code,
+          status: 'pending',
+          notes: notes || null,
+          totalUSD,
+          items: { create: lineItems },
+        },
+        include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+      })
+      break
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg.includes('Unique') || msg.includes('P2002')) continue
+      throw e
+    }
+  }
+  if (!created) return NextResponse.json({ error: 'No se pudo generar código único' }, { status: 500 })
 
   await notify({
     userId: ctx.ownerId,
     type: 'new_request',
     severity: 'info',
-    title: `Nuevo pedido de ${ctx.client.name}`,
+    title: `Nuevo pedido ${created.code} de ${ctx.client.name}`,
     body: `${lineItems.length} ${lineItems.length === 1 ? 'producto' : 'productos'} · Total $${totalUSD.toFixed(2)} USD`,
     link: `/requests/${created.id}`,
     resourceType: 'request',

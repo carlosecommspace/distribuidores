@@ -10,6 +10,7 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { toast } from '@/components/ui/Toast'
 import { formatUSD } from '@/lib/utils'
+import Link from 'next/link'
 import { Search, ShoppingCart, Minus, Plus, Trash2, Package } from 'lucide-react'
 
 interface CatalogProduct {
@@ -19,7 +20,7 @@ interface CatalogProduct {
   category?: string | null
   brand?: string | null
   unit: string
-  images: string[]
+  image?: string | null
   priceUSD: number
   stock: number
 }
@@ -165,10 +166,22 @@ export default function PortalCatalogPage() {
             const atMax = inCart >= p.stock
             return (
               <Card key={p.id} className={`overflow-hidden ${soldOut ? 'opacity-60' : ''}`}>
+                <Link href={`/portal/catalog/${p.id}`} className="block aspect-square bg-surface-2 relative">
+                  {p.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package size={40} className="text-text-muted" />
+                    </div>
+                  )}
+                </Link>
                 <CardBody className="flex flex-col gap-3">
                   <div>
                     <div className="text-xs font-mono text-text-muted">{p.sku}</div>
-                    <div className="font-display text-base text-text-primary line-clamp-2">{p.name}</div>
+                    <Link href={`/portal/catalog/${p.id}`} className="font-display text-base text-text-primary line-clamp-2 hover:text-accent">
+                      {p.name}
+                    </Link>
                     {p.category && <div className="text-xs text-text-muted">{p.category}</div>}
                   </div>
                   <div className="flex items-end justify-between gap-2">

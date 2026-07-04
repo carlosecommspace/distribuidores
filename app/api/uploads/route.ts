@@ -2,8 +2,16 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const MAX_BYTES = 5 * 1024 * 1024 // 5MB
+const MAX_BYTES = 5 * 1024 * 1024 // 5MB default
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'])
+
+// Límites específicos por propósito
+const PURPOSE_LIMITS: Record<string, { maxBytes: number; mime: Set<string> }> = {
+  product_image: {
+    maxBytes: 250 * 1024, // 250 KB
+    mime: new Set(['image/jpeg', 'image/png', 'image/webp']),
+  },
+}
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -34,11 +42,22 @@ export async function POST(req: Request) {
   if (file.size <= 0) {
     return NextResponse.json({ error: 'Archivo vacío' }, { status: 400 })
   }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: `Máximo 5 MB (recibido ${(file.size / 1024 / 1024).toFixed(1)} MB)` }, { status: 400 })
+
+  const limits = PURPOSE_LIMITS[purpose]
+  const maxBytes = limits?.maxBytes ?? MAX_BYTES
+  const allowedMime = limits?.mime ?? ALLOWED_MIME
+  const limitLabel = maxBytes >= 1024 * 1024
+    ? `${(maxBytes / 1024 / 1024).toFixed(0)} MB`
+    : `${(maxBytes / 1024).toFixed(0)} KB`
+
+  if (file.size > maxBytes) {
+    return NextResponse.json({
+      error: `Máximo ${limitLabel} (recibido ${(file.size / 1024).toFixed(0)} KB)`,
+    }, { status: 400 })
   }
-  if (!ALLOWED_MIME.has(file.type)) {
-    return NextResponse.json({ error: `Tipo no permitido: ${file.type}. Usa JPG, PNG, WEBP, GIF o PDF.` }, { status: 400 })
+  if (!allowedMime.has(file.type)) {
+    const list = Array.from(allowedMime).map((m) => m.split('/')[1].toUpperCase()).join(', ')
+    return NextResponse.json({ error: `Tipo no permitido: ${file.type}. Usa ${list}.` }, { status: 400 })
   }
 
   const buf = Buffer.from(await file.arrayBuffer())

@@ -248,6 +248,9 @@ model ProductRequest {
   clientId    String
   client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
+  // Código legible tipo DIS-001. Único por tenant.
+  code        String?
+
   // status: pending | partially_paid | paid | released | cancelled
   status      String   @default("pending")
   notes       String?
@@ -266,6 +269,7 @@ model ProductRequest {
   items       ProductRequestItem[]
   payments    Payment[]
 
+  @@unique([userId, code])
   @@index([userId, status])
   @@index([clientId])
   @@index([createdAt])
