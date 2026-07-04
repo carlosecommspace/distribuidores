@@ -43,9 +43,12 @@ export default function ClientsPage() {
   const [form, setForm] = useState({
     name: '',
     company: '',
+    rif: '',
+    contactPerson: '',
     phone: '',
     email: '',
     address: '',
+    billingAddress: '',
     city: '',
     type: 'retail',
     notes: '',
@@ -86,7 +89,7 @@ export default function ClientsPage() {
     }
     toast.success('Cliente creado')
     setOpen(false)
-    setForm({ name: '', company: '', phone: '', email: '', address: '', city: '', type: 'retail', notes: '', priceListId: '' })
+    setForm({ name: '', company: '', rif: '', contactPerson: '', phone: '', email: '', address: '', billingAddress: '', city: '', type: 'retail', notes: '', priceListId: '' })
     load()
   }
 
@@ -173,9 +176,18 @@ export default function ClientsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Empresa" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
-          <Input label="Teléfono" placeholder="+58..." value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="md:col-span-2" />
+          <Input label="RIF / Cédula" mono placeholder="J-30000000-0 o V-12345678" value={form.rif} onChange={(e) => setForm({ ...form, rif: e.target.value })} />
+          <Input label="Persona de contacto" placeholder="Nombre y apellido" value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} />
+          <Input label="Teléfono de contacto" placeholder="+58..." value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input label="Correo electrónico" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <Input label="Dirección física / despacho" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="md:col-span-2" />
+          <Input
+            label="Dirección de facturación"
+            hint="Opcional. Déjalo vacío si es igual a la dirección de despacho."
+            value={form.billingAddress}
+            onChange={(e) => setForm({ ...form, billingAddress: e.target.value })}
+            className="md:col-span-2"
+          />
           <Input label="Ciudad" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
           <Select
             label="Tipo"

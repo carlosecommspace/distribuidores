@@ -22,6 +22,8 @@ export interface OrderPrintData {
   id: string
   status: string
   totalUSD: number
+  discountUSD?: number
+  discountReason?: string | null
   paidUSD: number
   createdAt: string
   notes?: string | null
@@ -52,7 +54,9 @@ export function OrderPrintable({ data, auto = true }: { data: OrderPrintData; au
     return () => clearTimeout(t)
   }, [auto])
 
-  const outstanding = Math.max(0, data.totalUSD - data.paidUSD)
+  const discount = data.discountUSD || 0
+  const effectiveTotal = Math.max(0, data.totalUSD - discount)
+  const outstanding = Math.max(0, effectiveTotal - data.paidUSD)
 
   return (
     <>
@@ -147,7 +151,11 @@ export function OrderPrintable({ data, auto = true }: { data: OrderPrintData; au
           <div className="op-block">
             <div className="op-section-title">Estado</div>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>{statusLabel(data.status)}</div>
-            <div><span className="op-section-title" style={{ display: 'inline', marginRight: 4 }}>Total:</span> <span className="op-mono">{formatUSD(data.totalUSD)}</span></div>
+            <div><span className="op-section-title" style={{ display: 'inline', marginRight: 4 }}>Subtotal:</span> <span className="op-mono">{formatUSD(data.totalUSD)}</span></div>
+            {discount > 0 && (
+              <div><span className="op-section-title" style={{ display: 'inline', marginRight: 4 }}>Descuento:</span> <span className="op-mono">−{formatUSD(discount)}</span></div>
+            )}
+            <div><span className="op-section-title" style={{ display: 'inline', marginRight: 4 }}>Total:</span> <span className="op-mono">{formatUSD(effectiveTotal)}</span></div>
             <div><span className="op-section-title" style={{ display: 'inline', marginRight: 4 }}>Pagado:</span> <span className="op-mono">{formatUSD(data.paidUSD)}</span></div>
             <div><span className="op-section-title" style={{ display: 'inline', marginRight: 4 }}>Saldo:</span> <span className="op-mono">{formatUSD(outstanding)}</span></div>
             {data.releasedAt && (
@@ -180,9 +188,23 @@ export function OrderPrintable({ data, auto = true }: { data: OrderPrintData; au
               </tr>
             ))}
             <tr className="op-tot">
-              <td colSpan={4} className="op-right">Total USD</td>
+              <td colSpan={4} className="op-right">Subtotal USD</td>
               <td className="op-right op-mono">{formatUSD(data.totalUSD)}</td>
             </tr>
+            {discount > 0 && (
+              <tr className="op-tot">
+                <td colSpan={4} className="op-right" style={{ borderTop: '1px dashed #999' }}>
+                  Descuento {data.discountReason ? `(${data.discountReason})` : ''}
+                </td>
+                <td className="op-right op-mono" style={{ borderTop: '1px dashed #999' }}>−{formatUSD(discount)}</td>
+              </tr>
+            )}
+            {discount > 0 && (
+              <tr className="op-tot">
+                <td colSpan={4} className="op-right">Total USD</td>
+                <td className="op-right op-mono">{formatUSD(effectiveTotal)}</td>
+              </tr>
+            )}
           </tbody>
         </table>
 

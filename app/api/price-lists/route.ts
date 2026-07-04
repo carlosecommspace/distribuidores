@@ -15,10 +15,30 @@ export async function GET() {
   const userId = (session.user as { id: string }).id
   const lists = await prisma.priceList.findMany({
     where: { userId },
-    include: { _count: { select: { items: true, clients: true } } },
+    include: {
+      _count: { select: { items: true, clients: true } },
+      items: {
+        select: {
+          priceUSD: true,
+          product: { select: { priceUSD: true } },
+        },
+      },
+    },
     orderBy: { updatedAt: 'desc' },
   })
-  return NextResponse.json(lists)
+
+  // Enriquecer con métricas: totalValueUSD, avgDiscountPercent
+  const enriched = lists.map((l) => {
+    const totalListedUSD = l.items.reduce((s, x) => s + x.priceUSD, 0)
+    const totalBaseUSD = l.items.reduce((s, x) => s + x.product.priceUSD, 0)
+    const avgDiscountPercent = totalBaseUSD > 0
+      ? ((totalListedUSD - totalBaseUSD) / totalBaseUSD) * 100
+      : 0
+    const { items: _items, ...rest } = l
+    return { ...rest, totalListedUSD, totalBaseUSD, avgDiscountPercent }
+  })
+
+  return NextResponse.json(enriched)
 }
 
 export async function POST(req: Request) {

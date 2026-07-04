@@ -35,6 +35,8 @@ interface RequestDetail {
   status: string
   notes?: string | null
   totalUSD: number
+  discountUSD: number
+  discountReason?: string | null
   paidUSD: number
   createdAt: string
   releasedAt?: string | null
@@ -248,7 +250,8 @@ export default function PortalRequestDetail() {
   if (loading) return <Skeleton className="h-64" />
   if (!data) return <div className="text-text-muted">Pedido no encontrado</div>
 
-  const outstanding = Math.max(0, data.totalUSD - data.paidUSD)
+  const effectiveTotal = Math.max(0, data.totalUSD - (data.discountUSD || 0))
+  const outstanding = Math.max(0, effectiveTotal - data.paidUSD)
   const isClosed = data.status === 'released' || data.status === 'cancelled'
   const canPay = !isClosed && outstanding > 0
   const hasAnyPayment = data.payments.length > 0
@@ -298,11 +301,26 @@ export default function PortalRequestDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <Stat label="Total del pedido" value={formatUSD(data.totalUSD)} />
+      <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6">
+        <Stat
+          label={data.discountUSD > 0 ? 'Total con descuento' : 'Total del pedido'}
+          value={formatUSD(effectiveTotal)}
+          hint={
+            data.discountUSD > 0
+              ? <span className="text-success">Descuento: −{formatUSD(data.discountUSD)}</span>
+              : undefined
+          }
+        />
         <Stat label="Pagado" value={formatUSD(data.paidUSD)} accent={data.paidUSD > 0} />
         <Stat label="Saldo pendiente" value={formatUSD(outstanding)} />
       </div>
+
+      {data.discountUSD > 0 && (
+        <div className="bg-success-subtle border border-success/30 rounded-md p-3 mb-4 text-sm">
+          <div className="font-medium text-success">Descuento del distribuidor: −{formatUSD(data.discountUSD)}</div>
+          {data.discountReason && <div className="text-xs text-text-secondary mt-1">{data.discountReason}</div>}
+        </div>
+      )}
 
       {data.status === 'paid' && (
         <Card className="mb-4 border-success/30 bg-success-subtle">

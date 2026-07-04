@@ -6,9 +6,12 @@ import { z } from 'zod'
 const clientSchema = z.object({
   name: z.string().min(1),
   company: z.string().optional().nullable(),
+  rif: z.string().optional().nullable(),
+  contactPerson: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
   email: z.string().email().optional().nullable().or(z.literal('')),
   address: z.string().optional().nullable(),
+  billingAddress: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
   type: z.enum(['retail', 'wholesale', 'distributor']).default('retail'),
   notes: z.string().optional().nullable(),

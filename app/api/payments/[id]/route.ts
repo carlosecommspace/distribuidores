@@ -58,7 +58,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       type: 'request_paid',
       severity: 'success',
       title: `Pedido de ${payment.request.client.name} listo para liberar`,
-      body: `Pago completo verificado. Total USD ${refreshed.totalUSD.toFixed(2)}.`,
+      body: `Pago completo verificado. Total USD ${refreshed.effectiveTotalUSD.toFixed(2)}.`,
       link: `/requests/${payment.requestId}`,
       resourceType: 'request',
       resourceId: payment.requestId,
