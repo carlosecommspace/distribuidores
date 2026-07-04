@@ -35,9 +35,32 @@ export async function POST(req: Request) {
   const productIds = items.map((i) => i.productId)
   const products = await prisma.product.findMany({
     where: { id: { in: productIds }, userId: ctx.ownerId, isActive: true },
-    select: { id: true, priceUSD: true },
+    select: { id: true, name: true, priceUSD: true, stock: true, unit: true },
   })
-  const productMap = new Map(products.map((p) => [p.id, p.priceUSD]))
+  const productMap = new Map(products.map((p) => [p.id, p]))
+
+  // Validar stock antes de cualquier otro trabajo
+  const insufficient: Array<{ productId: string; name: string; requested: number; available: number }> = []
+  for (const it of items) {
+    const p = productMap.get(it.productId)
+    if (!p) continue
+    if (it.quantity > p.stock) {
+      insufficient.push({
+        productId: p.id,
+        name: p.name,
+        requested: it.quantity,
+        available: p.stock,
+      })
+    }
+  }
+  if (insufficient.length > 0) {
+    return NextResponse.json({
+      error: 'insufficient_stock',
+      message: 'No hay stock suficiente para uno o más productos',
+      items: insufficient,
+    }, { status: 400 })
+  }
+
   const validItems = items.filter((i) => productMap.has(i.productId))
   if (validItems.length === 0) return NextResponse.json({ error: 'no valid products' }, { status: 400 })
 
@@ -51,7 +74,8 @@ export async function POST(req: Request) {
   }
 
   const lineItems = validItems.map((i) => {
-    const priceUSD = overrides.get(i.productId) ?? productMap.get(i.productId)!
+    const p = productMap.get(i.productId)!
+    const priceUSD = overrides.get(i.productId) ?? p.priceUSD
     return {
       productId: i.productId,
       quantity: i.quantity,

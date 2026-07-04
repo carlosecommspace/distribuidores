@@ -9,7 +9,7 @@ const paymentSchema = z.object({
   amountUSD: z.coerce.number().positive(),
   method: z.enum(['cash_usd', 'cash_bs', 'zelle', 'binance', 'transfer_bs', 'transfer_usd', 'other']),
   reference: z.string().optional().nullable(),
-  proofUrl: z.string().url().optional().nullable().or(z.literal('')),
+  proofUrl: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
   // Si el admin lo registra y es efectivo, se puede marcar verificado de una
   verified: z.boolean().default(false),

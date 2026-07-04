@@ -11,6 +11,7 @@ import { Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Stat } from '@/components/ui/Stat'
 import { toast } from '@/components/ui/Toast'
+import { FileUpload } from '@/components/ui/FileUpload'
 import { formatUSD, formatDateTime, formatRelative } from '@/lib/utils'
 import { ArrowLeft, Plus, ExternalLink, CheckCircle, XCircle, Clock } from 'lucide-react'
 
@@ -257,13 +258,11 @@ export default function PortalRequestDetail() {
             onChange={(e) => setForm({ ...form, reference: e.target.value })}
             placeholder="Ej: últimos 4 dígitos, # de Binance..."
           />
-          <Input
-            label="URL del comprobante"
-            type="url"
-            value={form.proofUrl}
-            onChange={(e) => setForm({ ...form, proofUrl: e.target.value })}
-            placeholder="https://..."
-            hint="Sube la captura a Drive/ImgBB/Telegram y pega el enlace aquí"
+          <FileUpload
+            label="Comprobante de pago"
+            hint="JPG, PNG o PDF. Máximo 5 MB."
+            value={form.proofUrl || null}
+            onChange={(url) => setForm({ ...form, proofUrl: url || '' })}
           />
           <Textarea
             label="Notas adicionales"

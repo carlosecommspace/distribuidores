@@ -14,7 +14,7 @@ export default async function PortalLayout({ children }: { children: React.React
 
   const client = await prisma.client.findUnique({
     where: { id: su.clientId },
-    select: { id: true, name: true, company: true, priceList: { select: { name: true } } },
+    select: { id: true, name: true, company: true },
   })
   if (!client) redirect('/login')
 
@@ -35,9 +35,6 @@ export default async function PortalLayout({ children }: { children: React.React
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden sm:block text-right">
               <div className="text-sm text-text-primary truncate max-w-[180px]">{client.company || client.name}</div>
-              {client.priceList && (
-                <div className="text-[11px] text-text-muted">Lista: {client.priceList.name}</div>
-              )}
             </div>
             <form action="/api/auth/signout" method="post">
               <button type="submit" className="text-text-muted hover:text-danger p-1.5 rounded-md hover:bg-surface-2" title="Cerrar sesión">

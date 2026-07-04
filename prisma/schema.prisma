@@ -33,6 +33,21 @@ model User {
   settings      Settings?
 }
 
+model FileUpload {
+  id        String   @id @default(cuid())
+  userId    String   // tenant owner (dueño de la data, no necesariamente quién subió)
+  uploaderId String  // usuario específico que subió (admin o portal)
+  purpose   String   @default("payment_proof") // payment_proof, product_image, other
+  filename  String
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([purpose])
+}
+
 model Notification {
   id        String   @id @default(cuid())
   userId    String

@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/Select'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/Table'
 import { Stat } from '@/components/ui/Stat'
 import { toast } from '@/components/ui/Toast'
+import { FileUpload } from '@/components/ui/FileUpload'
 import { formatUSD, formatBs, formatDateTime, formatRelative } from '@/lib/utils'
 import { ArrowLeft, CheckCircle, XCircle, Send, Plus, ExternalLink, RotateCcw } from 'lucide-react'
 
@@ -351,7 +352,11 @@ export default function RequestDetailPage() {
             ]}
           />
           <Input label="Referencia" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} placeholder="últimos 4 dígitos, # de transacción" />
-          <Input label="URL del comprobante (opcional)" type="url" value={form.proofUrl} onChange={(e) => setForm({ ...form, proofUrl: e.target.value })} placeholder="https://..." />
+          <FileUpload
+            label="Comprobante (opcional)"
+            value={form.proofUrl || null}
+            onChange={(url) => setForm({ ...form, proofUrl: url || '' })}
+          />
           <Textarea label="Nota" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
           <label className="flex items-center gap-2 text-sm">
             <input

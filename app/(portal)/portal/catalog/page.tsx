@@ -21,8 +21,6 @@ interface CatalogProduct {
   unit: string
   images: string[]
   priceUSD: number
-  listPriceUSD: number
-  custom: boolean
   stock: number
 }
 
@@ -34,7 +32,6 @@ interface CartLine {
 export default function PortalCatalogPage() {
   const router = useRouter()
   const [products, setProducts] = useState<CatalogProduct[]>([])
-  const [priceListName, setPriceListName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
   const [cart, setCart] = useState<Record<string, CartLine>>({})
@@ -47,7 +44,6 @@ export default function PortalCatalogPage() {
     const r = await fetch(`/api/portal/catalog${q ? `?q=${encodeURIComponent(q)}` : ''}`)
     const data = await r.json()
     setProducts(data.products || [])
-    setPriceListName(data.priceList?.name || null)
     setLoading(false)
   }
 
@@ -60,7 +56,11 @@ export default function PortalCatalogPage() {
   const addToCart = (p: CatalogProduct, delta = 1) => {
     setCart((prev) => {
       const cur = prev[p.id]?.quantity || 0
-      const next = Math.max(0, cur + delta)
+      let next = Math.max(0, cur + delta)
+      if (next > p.stock) {
+        next = p.stock
+        if (p.stock > 0) toast.error(`Sólo hay ${p.stock} ${p.unit} disponibles de ${p.name}`)
+      }
       if (next === 0) {
         const { [p.id]: _, ...rest } = prev
         return rest
@@ -70,7 +70,11 @@ export default function PortalCatalogPage() {
   }
 
   const setQty = (p: CatalogProduct, qty: number) => {
-    const v = Math.max(0, Math.floor(qty))
+    let v = Math.max(0, Math.floor(qty))
+    if (v > p.stock) {
+      v = p.stock
+      if (p.stock > 0) toast.error(`Sólo hay ${p.stock} ${p.unit} disponibles`)
+    }
     if (v === 0) {
       setCart((prev) => {
         const { [p.id]: _, ...rest } = prev
@@ -101,7 +105,14 @@ export default function PortalCatalogPage() {
     })
     setSubmitting(false)
     if (!r.ok) {
-      toast.error('Error enviando el pedido')
+      const e = await r.json().catch(() => ({} as { error?: string; message?: string; items?: Array<{ name: string; requested: number; available: number }> }))
+      if (e?.error === 'insufficient_stock' && e.items?.length) {
+        const first = e.items[0]
+        toast.error(`Sin stock suficiente para ${first.name} (pediste ${first.requested}, hay ${first.available}). Actualizando catálogo…`)
+        await load()
+        return
+      }
+      toast.error((e as { message?: string })?.message || 'Error enviando el pedido')
       return
     }
     toast.success('Pedido enviado')
@@ -117,7 +128,7 @@ export default function PortalCatalogPage() {
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-bold text-text-primary">Catálogo</h1>
           <p className="text-sm text-text-secondary mt-1">
-            {priceListName ? `Precios de tu lista: ${priceListName}` : 'Precios base'}
+            Selecciona los productos que necesitas y arma tu pedido.
           </p>
         </div>
         <Button onClick={() => setCartOpen(true)} disabled={cartCount === 0}>
@@ -150,8 +161,10 @@ export default function PortalCatalogPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {products.map((p) => {
             const inCart = cart[p.id]?.quantity || 0
+            const soldOut = p.stock <= 0
+            const atMax = inCart >= p.stock
             return (
-              <Card key={p.id} className="overflow-hidden">
+              <Card key={p.id} className={`overflow-hidden ${soldOut ? 'opacity-60' : ''}`}>
                 <CardBody className="flex flex-col gap-3">
                   <div>
                     <div className="text-xs font-mono text-text-muted">{p.sku}</div>
@@ -161,12 +174,13 @@ export default function PortalCatalogPage() {
                   <div className="flex items-end justify-between gap-2">
                     <div>
                       <div className="font-mono text-xl text-accent">{formatUSD(p.priceUSD)}</div>
-                      {p.custom && p.listPriceUSD !== p.priceUSD && (
-                        <Badge tone="accent" className="mt-1">Precio especial</Badge>
-                      )}
-                      <div className="text-[11px] text-text-muted mt-1">Disponible: {p.stock} {p.unit}</div>
+                      <div className={`text-[11px] mt-1 ${soldOut ? 'text-danger' : 'text-text-muted'}`}>
+                        {soldOut ? 'Sin stock' : `Disponible: ${p.stock} ${p.unit}`}
+                      </div>
                     </div>
-                    {inCart > 0 ? (
+                    {soldOut ? (
+                      <Badge tone="danger">Agotado</Badge>
+                    ) : inCart > 0 ? (
                       <div className="flex items-center gap-1 bg-surface-2 border border-border rounded-md p-1">
                         <button
                           onClick={() => addToCart(p, -1)}
@@ -178,14 +192,17 @@ export default function PortalCatalogPage() {
                         <input
                           type="number"
                           min="0"
+                          max={p.stock}
                           value={inCart}
                           onChange={(e) => setQty(p, parseInt(e.target.value || '0', 10))}
                           className="w-12 text-center bg-transparent text-sm font-mono outline-none"
                         />
                         <button
                           onClick={() => addToCart(p, 1)}
-                          className="p-1.5 text-text-secondary hover:text-text-primary"
+                          disabled={atMax}
+                          className="p-1.5 text-text-secondary hover:text-text-primary disabled:opacity-40 disabled:cursor-not-allowed"
                           aria-label="Sumar"
+                          title={atMax ? `Máximo disponible: ${p.stock}` : undefined}
                         >
                           <Plus size={14} />
                         </button>

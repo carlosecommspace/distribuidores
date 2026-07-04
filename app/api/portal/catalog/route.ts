@@ -44,14 +44,17 @@ export async function GET(req: Request) {
     overrides = new Map(items.map((i) => [i.productId, i.priceUSD]))
   }
 
+  // No exponemos si el precio viene de una lista o es base — es información interna
   const out = products.map((p) => ({
-    ...p,
+    id: p.id,
+    sku: p.sku,
+    name: p.name,
+    category: p.category,
+    brand: p.brand,
+    unit: p.unit,
+    images: p.images,
     priceUSD: overrides.get(p.id) ?? p.priceUSD,
-    listPriceUSD: p.priceUSD,
-    custom: overrides.has(p.id),
+    stock: p.stock,
   }))
-  return NextResponse.json({
-    products: out,
-    priceList: ctx.client.priceList ? { id: ctx.client.priceList.id, name: ctx.client.priceList.name } : null,
-  })
+  return NextResponse.json({ products: out })
 }
