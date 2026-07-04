@@ -13,7 +13,7 @@ import { Stat } from '@/components/ui/Stat'
 import { toast } from '@/components/ui/Toast'
 import { FileUpload } from '@/components/ui/FileUpload'
 import { formatUSD, formatDateTime, formatRelative } from '@/lib/utils'
-import { ArrowLeft, Plus, ExternalLink, CheckCircle, XCircle, Clock, Printer, Trash2, Pencil, Minus, Search } from 'lucide-react'
+import { ArrowLeft, Plus, ExternalLink, CheckCircle, XCircle, Clock, Printer, Trash2, Pencil, Minus, Search, Wallet, Copy } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface Payment {
@@ -78,6 +78,13 @@ export default function PortalRequestDetail() {
   const [editSaving, setEditSaving] = useState(false)
   const [productSearch, setProductSearch] = useState('')
   const [productResults, setProductResults] = useState<CatalogProduct[]>([])
+  const [methodsOpen, setMethodsOpen] = useState(false)
+  const [methods, setMethods] = useState<Array<{
+    id: string; type: string; label: string; accountName?: string | null;
+    accountNumber?: string | null; bankName?: string | null; documentId?: string | null;
+    currency: string; instructions?: string | null;
+  }>>([])
+  const [methodsLoaded, setMethodsLoaded] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -86,6 +93,22 @@ export default function PortalRequestDetail() {
     setLoading(false)
   }
   useEffect(() => { load() }, [params.id])
+
+  useEffect(() => {
+    fetch('/api/portal/payment-methods').then((r) => r.json()).then((d) => {
+      setMethods(Array.isArray(d) ? d : [])
+      setMethodsLoaded(true)
+    }).catch(() => setMethodsLoaded(true))
+  }, [])
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(`${label} copiado`)
+    } catch {
+      toast.error('No se pudo copiar')
+    }
+  }
 
   const openPaymentForm = () => {
     const outstanding = data ? Math.max(0, data.totalUSD - data.paidUSD) : 0
@@ -260,6 +283,11 @@ export default function PortalRequestDetail() {
           {canCancel && (
             <Button variant="ghost" onClick={cancelOrder} loading={cancelling}>
               <Trash2 size={14} /> Cancelar
+            </Button>
+          )}
+          {canPay && methods.length > 0 && (
+            <Button variant="secondary" onClick={() => setMethodsOpen(true)}>
+              <Wallet size={14} /> Métodos de pago
             </Button>
           )}
           {canPay && (
@@ -494,8 +522,80 @@ export default function PortalRequestDetail() {
           />
         </div>
       </Modal>
+
+      <Modal
+        open={methodsOpen}
+        onOpenChange={setMethodsOpen}
+        title="Métodos de pago disponibles"
+        description="Elige uno de estos métodos, realiza el pago y luego notifícalo con el comprobante."
+        size="md"
+      >
+        {methods.length === 0 ? (
+          <div className="text-sm text-text-muted text-center py-6">
+            El distribuidor aún no ha cargado métodos de pago.
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {methods.map((m) => (
+              <li key={m.id} className="border border-border rounded-md p-4 bg-surface-2">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <span className="font-medium text-text-primary">{m.label}</span>
+                  <div className="flex items-center gap-1.5">
+                    <Badge tone="info">{m.currency}</Badge>
+                    <Badge>{labelMethodPortal(m.type)}</Badge>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5 text-sm text-text-secondary">
+                  {m.accountName && (
+                    <MethodRow label="Titular" value={m.accountName} onCopy={copyToClipboard} />
+                  )}
+                  {m.accountNumber && (
+                    <MethodRow label="Cuenta / ID" value={m.accountNumber} mono onCopy={copyToClipboard} />
+                  )}
+                  {m.bankName && <MethodRow label="Banco" value={m.bankName} onCopy={copyToClipboard} />}
+                  {m.documentId && (
+                    <MethodRow label="C.I./RIF" value={m.documentId} mono onCopy={copyToClipboard} />
+                  )}
+                </div>
+                {m.instructions && (
+                  <div className="mt-3 text-xs text-text-muted italic border-t border-border pt-2">
+                    {m.instructions}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
     </div>
   )
+}
+
+function MethodRow({ label, value, mono, onCopy }: { label: string; value: string; mono?: boolean; onCopy: (v: string, l: string) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-2 flex-wrap">
+      <span className="text-xs uppercase tracking-wider text-text-muted">{label}</span>
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className={`text-sm text-text-primary truncate ${mono ? 'font-mono' : ''}`}>{value}</span>
+        <button onClick={() => onCopy(value, label)} className="text-text-muted hover:text-accent flex-shrink-0 p-1" title="Copiar">
+          <Copy size={12} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function labelMethodPortal(t: string): string {
+  const map: Record<string, string> = {
+    zelle: 'Zelle',
+    binance: 'Binance',
+    bank_transfer_usd: 'Transf. USD',
+    bank_transfer_bs: 'Transf. Bs',
+    cash_usd: 'Efectivo USD',
+    cash_bs: 'Efectivo Bs',
+    other: 'Otro',
+  }
+  return map[t] || t
 }
 
 function StatusBadge({ status }: { status: string }) {

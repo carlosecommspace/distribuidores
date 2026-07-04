@@ -124,18 +124,34 @@ export default function PortalCatalogPage() {
   }
 
   return (
-    <div>
+    <div className="pb-24 md:pb-0">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold text-text-primary">Catálogo</h1>
+        <div className="min-w-0">
+          <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold text-text-primary">Catálogo</h1>
           <p className="text-sm text-text-secondary mt-1">
             Selecciona los productos que necesitas y arma tu pedido.
           </p>
         </div>
-        <Button onClick={() => setCartOpen(true)} disabled={cartCount === 0}>
+        <Button onClick={() => setCartOpen(true)} disabled={cartCount === 0} className="hidden md:inline-flex">
           <ShoppingCart size={16} /> Carrito ({cartCount})
         </Button>
       </div>
+
+      {/* Carrito flotante para móvil */}
+      {cartCount > 0 && (
+        <div className="md:hidden fixed bottom-4 left-4 right-4 z-30">
+          <button
+            onClick={() => setCartOpen(true)}
+            className="w-full bg-accent text-black px-4 py-3.5 rounded-lg shadow-lg font-medium flex items-center justify-between gap-3"
+          >
+            <span className="inline-flex items-center gap-2">
+              <ShoppingCart size={18} />
+              <span>Ver carrito ({cartCount})</span>
+            </span>
+            <span className="font-mono">{formatUSD(cartTotal)}</span>
+          </button>
+        </div>
+      )}
 
       <Card className="mb-4">
         <div className="px-4 py-3 flex items-center gap-3">
@@ -147,7 +163,7 @@ export default function PortalCatalogPage() {
       </Card>
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
         </div>
       ) : products.length === 0 ? (
@@ -159,13 +175,13 @@ export default function PortalCatalogPage() {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
           {products.map((p) => {
             const inCart = cart[p.id]?.quantity || 0
             const soldOut = p.stock <= 0
             const atMax = inCart >= p.stock
             return (
-              <Card key={p.id} className={`overflow-hidden ${soldOut ? 'opacity-60' : ''}`}>
+              <Card key={p.id} className={`overflow-hidden flex flex-col ${soldOut ? 'opacity-60' : ''}`}>
                 <Link href={`/portal/catalog/${p.id}`} className="block aspect-square bg-surface-2 relative">
                   {p.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -175,32 +191,37 @@ export default function PortalCatalogPage() {
                       <Package size={40} className="text-text-muted" />
                     </div>
                   )}
+                  {inCart > 0 && (
+                    <span className="absolute top-2 right-2 bg-accent text-black text-xs font-mono font-semibold rounded-full h-6 min-w-[24px] px-1.5 flex items-center justify-center">
+                      {inCart}
+                    </span>
+                  )}
                 </Link>
-                <CardBody className="flex flex-col gap-3">
+                <CardBody className="flex flex-col gap-3 flex-1">
                   <div>
                     <div className="text-xs font-mono text-text-muted">{p.sku}</div>
-                    <Link href={`/portal/catalog/${p.id}`} className="font-display text-base text-text-primary line-clamp-2 hover:text-accent">
+                    <Link href={`/portal/catalog/${p.id}`} className="font-display text-sm sm:text-base text-text-primary line-clamp-2 hover:text-accent block">
                       {p.name}
                     </Link>
                     {p.category && <div className="text-xs text-text-muted">{p.category}</div>}
                   </div>
-                  <div className="flex items-end justify-between gap-2">
-                    <div>
-                      <div className="font-mono text-xl text-accent">{formatUSD(p.priceUSD)}</div>
-                      <div className={`text-[11px] mt-1 ${soldOut ? 'text-danger' : 'text-text-muted'}`}>
-                        {soldOut ? 'Sin stock' : `Disponible: ${p.stock} ${p.unit}`}
-                      </div>
-                    </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-mono text-xl text-accent">{formatUSD(p.priceUSD)}</span>
+                    <span className={`text-[11px] ${soldOut ? 'text-danger' : 'text-text-muted'}`}>
+                      {soldOut ? 'Sin stock' : `${p.stock} ${p.unit}`}
+                    </span>
+                  </div>
+                  <div className="mt-auto pt-1">
                     {soldOut ? (
-                      <Badge tone="danger">Agotado</Badge>
+                      <Badge tone="danger" className="w-full justify-center py-2">Agotado</Badge>
                     ) : inCart > 0 ? (
-                      <div className="flex items-center gap-1 bg-surface-2 border border-border rounded-md p-1">
+                      <div className="flex items-center justify-between bg-accent-subtle border border-accent-border rounded-md">
                         <button
                           onClick={() => addToCart(p, -1)}
-                          className="p-1.5 text-text-secondary hover:text-text-primary"
+                          className="p-3 text-accent hover:bg-accent/10 active:bg-accent/20"
                           aria-label="Restar"
                         >
-                          <Minus size={14} />
+                          <Minus size={16} />
                         </button>
                         <input
                           type="number"
@@ -208,21 +229,24 @@ export default function PortalCatalogPage() {
                           max={p.stock}
                           value={inCart}
                           onChange={(e) => setQty(p, parseInt(e.target.value || '0', 10))}
-                          className="w-12 text-center bg-transparent text-sm font-mono outline-none"
+                          className="w-full text-center bg-transparent text-base font-mono outline-none text-accent"
                         />
                         <button
                           onClick={() => addToCart(p, 1)}
                           disabled={atMax}
-                          className="p-1.5 text-text-secondary hover:text-text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="p-3 text-accent hover:bg-accent/10 active:bg-accent/20 disabled:opacity-40 disabled:cursor-not-allowed"
                           aria-label="Sumar"
                           title={atMax ? `Máximo disponible: ${p.stock}` : undefined}
                         >
-                          <Plus size={14} />
+                          <Plus size={16} />
                         </button>
                       </div>
                     ) : (
-                      <Button onClick={() => addToCart(p, 1)} variant="ghost">
-                        <Plus size={14} /> Agregar
+                      <Button
+                        onClick={() => addToCart(p, 1)}
+                        className="w-full justify-center py-2.5"
+                      >
+                        <ShoppingCart size={16} /> Agregar al carrito
                       </Button>
                     )}
                   </div>
