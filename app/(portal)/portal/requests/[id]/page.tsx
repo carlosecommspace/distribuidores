@@ -13,7 +13,8 @@ import { Stat } from '@/components/ui/Stat'
 import { toast } from '@/components/ui/Toast'
 import { FileUpload } from '@/components/ui/FileUpload'
 import { formatUSD, formatDateTime, formatRelative } from '@/lib/utils'
-import { ArrowLeft, Plus, ExternalLink, CheckCircle, XCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Plus, ExternalLink, CheckCircle, XCircle, Clock, Printer, Trash2, Pencil, Minus, Search } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface Payment {
   id: string
@@ -30,6 +31,7 @@ interface Payment {
 
 interface RequestDetail {
   id: string
+  code?: string | null
   status: string
   notes?: string | null
   totalUSD: number
@@ -46,8 +48,18 @@ interface RequestDetail {
   payments: Payment[]
 }
 
+interface CatalogProduct {
+  id: string
+  sku: string
+  name: string
+  priceUSD: number
+  stock: number
+  unit: string
+}
+
 export default function PortalRequestDetail() {
   const params = useParams<{ id: string }>()
+  const router = useRouter()
   const [data, setData] = useState<RequestDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -59,6 +71,13 @@ export default function PortalRequestDetail() {
     proofUrl: '',
     note: '',
   })
+  const [cancelling, setCancelling] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editItems, setEditItems] = useState<Record<string, { product: CatalogProduct; quantity: number }>>({})
+  const [editNotes, setEditNotes] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [productSearch, setProductSearch] = useState('')
+  const [productResults, setProductResults] = useState<CatalogProduct[]>([])
 
   const load = async () => {
     setLoading(true)
@@ -102,31 +121,153 @@ export default function PortalRequestDetail() {
     load()
   }
 
+  const cancelOrder = async () => {
+    if (!confirm('¿Cancelar este pedido? No podrás recuperarlo.')) return
+    setCancelling(true)
+    const r = await fetch(`/api/portal/requests/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'cancel' }),
+    })
+    setCancelling(false)
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}))
+      toast.error(typeof e.error === 'string' ? e.error : 'Error cancelando')
+      return
+    }
+    toast.success('Pedido cancelado')
+    load()
+  }
+
+  const openEdit = () => {
+    if (!data) return
+    const map: Record<string, { product: CatalogProduct; quantity: number }> = {}
+    for (const it of data.items) {
+      map[it.product.id] = {
+        product: { id: it.product.id, sku: it.product.sku, name: it.product.name, unit: it.product.unit, priceUSD: it.priceUSD, stock: 9999 },
+        quantity: it.quantity,
+      }
+    }
+    setEditItems(map)
+    setEditNotes(data.notes || '')
+    setProductSearch('')
+    setProductResults([])
+    setEditOpen(true)
+  }
+
+  useEffect(() => {
+    if (!editOpen) return
+    const t = setTimeout(async () => {
+      if (!productSearch.trim()) return setProductResults([])
+      const r = await fetch(`/api/portal/catalog?q=${encodeURIComponent(productSearch)}`)
+      const d = await r.json()
+      setProductResults((d.products || []).slice(0, 8))
+    }, 200)
+    return () => clearTimeout(t)
+  }, [productSearch, editOpen])
+
+  const addEditItem = (p: CatalogProduct) => {
+    setEditItems((prev) => {
+      const cur = prev[p.id]?.quantity || 0
+      const next = Math.min(p.stock, cur + 1)
+      if (next <= 0) return prev
+      return { ...prev, [p.id]: { product: p, quantity: next } }
+    })
+    setProductSearch('')
+    setProductResults([])
+  }
+
+  const changeEditQty = (productId: string, delta: number) => {
+    setEditItems((prev) => {
+      const cur = prev[productId]
+      if (!cur) return prev
+      const next = Math.max(0, cur.quantity + delta)
+      if (next === 0) {
+        const { [productId]: _, ...rest } = prev
+        return rest
+      }
+      if (next > cur.product.stock && cur.product.stock < 9999) {
+        toast.error(`Sólo hay ${cur.product.stock} disponibles`)
+        return prev
+      }
+      return { ...prev, [productId]: { ...cur, quantity: next } }
+    })
+  }
+
+  const submitEdit = async () => {
+    const items = Object.values(editItems).map((v) => ({ productId: v.product.id, quantity: v.quantity }))
+    if (items.length === 0) {
+      toast.error('El pedido debe tener al menos un producto')
+      return
+    }
+    setEditSaving(true)
+    const r = await fetch(`/api/portal/requests/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'update', items, notes: editNotes || null }),
+    })
+    setEditSaving(false)
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({} as { error?: string; message?: string; items?: Array<{ name: string; requested: number; available: number }> }))
+      if (e?.error === 'insufficient_stock' && e.items?.length) {
+        const first = e.items[0]
+        toast.error(`Sin stock para ${first.name}: pediste ${first.requested}, hay ${first.available}`)
+        return
+      }
+      toast.error(typeof e.error === 'string' ? e.error : 'Error editando pedido')
+      return
+    }
+    toast.success('Pedido actualizado')
+    setEditOpen(false)
+    load()
+  }
+
   if (loading) return <Skeleton className="h-64" />
   if (!data) return <div className="text-text-muted">Pedido no encontrado</div>
 
   const outstanding = Math.max(0, data.totalUSD - data.paidUSD)
   const isClosed = data.status === 'released' || data.status === 'cancelled'
   const canPay = !isClosed && outstanding > 0
+  const hasAnyPayment = data.payments.length > 0
+  const canCancel = !isClosed && !data.payments.some((p) => p.status === 'verified')
+  const canEdit = !isClosed && !hasAnyPayment
+  const editTotal = Object.values(editItems).reduce((s, l) => s + l.quantity * l.product.priceUSD, 0)
 
   return (
     <div>
       <Link href="/portal/requests" className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-accent mb-4">
         <ArrowLeft size={14} /> Mis pedidos
       </Link>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="font-display text-2xl font-bold text-text-primary">Pedido #{data.id.slice(-6).toUpperCase()}</h1>
+          <h1 className="font-display text-2xl font-bold text-text-primary font-mono">
+            {data.code || `Pedido #${data.id.slice(-6).toUpperCase()}`}
+          </h1>
           <div className="text-sm text-text-secondary mt-1 flex items-center gap-2 flex-wrap">
             <span>{formatRelative(data.createdAt)}</span>
             <StatusBadge status={data.status} />
           </div>
         </div>
-        {canPay && (
-          <Button onClick={openPaymentForm}>
-            <Plus size={14} /> Notificar pago
-          </Button>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          <a href={`/print/portal/${data.id}`} target="_blank" rel="noreferrer">
+            <Button variant="secondary"><Printer size={14} /> Imprimir / PDF</Button>
+          </a>
+          {canEdit && (
+            <Button variant="ghost" onClick={openEdit}>
+              <Pencil size={14} /> Editar
+            </Button>
+          )}
+          {canCancel && (
+            <Button variant="ghost" onClick={cancelOrder} loading={cancelling}>
+              <Trash2 size={14} /> Cancelar
+            </Button>
+          )}
+          {canPay && (
+            <Button onClick={openPaymentForm}>
+              <Plus size={14} /> Notificar pago
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
@@ -268,6 +409,88 @@ export default function PortalRequestDetail() {
             label="Notas adicionales"
             value={form.note}
             onChange={(e) => setForm({ ...form, note: e.target.value })}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        title="Editar pedido"
+        description="Ajusta cantidades, agrega o quita productos. Sólo puedes editar antes de notificar el pago."
+        size="lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancelar</Button>
+            <Button loading={editSaving} onClick={submitEdit}>Guardar cambios</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <Input
+              className="pl-9"
+              placeholder="Buscar producto para agregar"
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+            />
+            {productResults.length > 0 && (
+              <ul className="absolute left-0 right-0 mt-1 z-10 bg-surface border border-border rounded-md divide-y divide-border max-h-56 overflow-y-auto shadow-lg">
+                {productResults.map((p) => (
+                  <li
+                    key={p.id}
+                    className="px-3 py-2 hover:bg-surface-2 cursor-pointer flex items-center justify-between"
+                    onClick={() => addEditItem(p)}
+                  >
+                    <div>
+                      <div className="text-sm">{p.name}</div>
+                      <div className="text-xs text-text-muted font-mono">{p.sku} · stock {p.stock}</div>
+                    </div>
+                    <div className="text-sm font-mono text-accent">{formatUSD(p.priceUSD)}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {Object.keys(editItems).length === 0 ? (
+            <div className="text-center py-8 text-sm text-text-muted border border-border rounded-md">
+              Aún no hay productos en el pedido.
+            </div>
+          ) : (
+            <ul className="divide-y divide-border border border-border rounded-md">
+              {Object.values(editItems).map((line) => (
+                <li key={line.product.id} className="px-4 py-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm">{line.product.name}</div>
+                    <div className="text-xs text-text-muted font-mono">{line.product.sku}</div>
+                  </div>
+                  <div className="flex items-center gap-1 bg-surface-2 border border-border rounded-md p-1">
+                    <button onClick={() => changeEditQty(line.product.id, -1)} className="p-1 text-text-secondary hover:text-text-primary">
+                      <Minus size={14} />
+                    </button>
+                    <span className="w-8 text-center font-mono text-sm">{line.quantity}</span>
+                    <button onClick={() => changeEditQty(line.product.id, 1)} className="p-1 text-text-secondary hover:text-text-primary">
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                  <div className="font-mono text-sm text-accent w-24 text-right">
+                    {formatUSD(line.quantity * line.product.priceUSD)}
+                  </div>
+                </li>
+              ))}
+              <li className="px-4 py-2 flex items-center justify-between bg-surface-2">
+                <span className="text-xs text-text-secondary uppercase tracking-wider">Total</span>
+                <span className="font-mono text-accent">{formatUSD(editTotal)}</span>
+              </li>
+            </ul>
+          )}
+
+          <Textarea
+            label="Notas para el distribuidor"
+            value={editNotes}
+            onChange={(e) => setEditNotes(e.target.value)}
           />
         </div>
       </Modal>

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
+import { FileUpload } from '@/components/ui/FileUpload'
 import Link from 'next/link'
 
 interface CategoryOption {
@@ -61,7 +62,6 @@ export function ProductForm({
   onChange: (v: ProductFormValues) => void
   rate: number
 }) {
-  const [imgInput, setImgInput] = useState('')
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const set = <K extends keyof ProductFormValues>(k: K, v: ProductFormValues[K]) => onChange({ ...value, [k]: v })
   const margin = value.costUSD > 0 ? ((value.priceUSD - value.costUSD) / value.costUSD) * 100 : 0
@@ -209,42 +209,14 @@ export function ProductForm({
       </section>
 
       <section>
-        <h4 className="text-xs uppercase tracking-wider text-text-secondary mb-3">Imágenes (URLs)</h4>
-        <div className="flex gap-2">
-          <input
-            value={imgInput}
-            onChange={(e) => setImgInput(e.target.value)}
-            placeholder="https://..."
-            className="input-base flex-1"
-          />
-          <button
-            type="button"
-            className="px-3 py-2 text-sm bg-surface-2 border border-border rounded-md hover:bg-surface-3"
-            onClick={() => {
-              if (!imgInput) return
-              set('images', [...value.images, imgInput])
-              setImgInput('')
-            }}
-          >
-            Añadir
-          </button>
-        </div>
-        {value.images.length > 0 && (
-          <ul className="mt-3 flex flex-col gap-1.5">
-            {value.images.map((u, i) => (
-              <li key={i} className="flex items-center gap-2 text-xs text-text-secondary bg-surface-2 rounded-md px-3 py-2">
-                <span className="flex-1 truncate">{u}</span>
-                <button
-                  type="button"
-                  className="text-danger"
-                  onClick={() => set('images', value.images.filter((_, j) => j !== i))}
-                >
-                  Eliminar
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <h4 className="text-xs uppercase tracking-wider text-text-secondary mb-3">Imagen del producto</h4>
+        <FileUpload
+          purpose="product_image"
+          accept="image/jpeg,image/png,image/webp"
+          hint="Formato JPG, PNG o WEBP. Máximo 250 KB. Una sola imagen por producto."
+          value={value.images[0] || null}
+          onChange={(url) => set('images', url ? [url] : [])}
+        />
       </section>
     </div>
   )

@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     category: p.category,
     brand: p.brand,
     unit: p.unit,
-    images: p.images,
+    image: p.images?.[0] || null,
     priceUSD: overrides.get(p.id) ?? p.priceUSD,
     stock: p.stock,
   }))

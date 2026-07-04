@@ -15,7 +15,7 @@ import { Stat } from '@/components/ui/Stat'
 import { toast } from '@/components/ui/Toast'
 import { FileUpload } from '@/components/ui/FileUpload'
 import { formatUSD, formatBs, formatDateTime, formatRelative } from '@/lib/utils'
-import { ArrowLeft, CheckCircle, XCircle, Send, Plus, ExternalLink, RotateCcw } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Send, Plus, ExternalLink, RotateCcw, Printer } from 'lucide-react'
 
 interface Payment {
   id: string
@@ -35,6 +35,7 @@ interface Payment {
 
 interface RequestDetail {
   id: string
+  code?: string | null
   status: string
   notes?: string | null
   totalUSD: number
@@ -163,7 +164,7 @@ export default function RequestDetailPage() {
       </Link>
 
       <PageHeader
-        title={`Pedido #${data.id.slice(-6).toUpperCase()}`}
+        title={data.code || `Pedido #${data.id.slice(-6).toUpperCase()}`}
         subtitle={
           <span className="flex items-center gap-2 flex-wrap">
             <Link href={`/clients/${data.client.id}`} className="hover:text-accent">{data.client.name}</Link>
@@ -174,6 +175,9 @@ export default function RequestDetailPage() {
         }
         actions={
           <div className="flex gap-2 flex-wrap">
+            <a href={`/print/admin/${data.id}`} target="_blank" rel="noreferrer">
+              <Button variant="secondary"><Printer size={14} /> Imprimir / PDF</Button>
+            </a>
             {!isClosed && (
               <>
                 <Button variant="secondary" onClick={() => setAddOpen(true)}>

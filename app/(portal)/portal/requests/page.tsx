@@ -20,6 +20,7 @@ interface ReqItem {
 }
 interface PortalRequest {
   id: string
+  code?: string | null
   status: string
   notes?: string | null
   totalUSD: number
@@ -74,6 +75,7 @@ export default function PortalRequestsPage() {
             <Table>
               <THead>
                 <TR>
+                  <TH>Código</TH>
                   <TH>Fecha</TH>
                   <TH className="text-right">Productos</TH>
                   <TH className="text-right">Total</TH>
@@ -84,6 +86,7 @@ export default function PortalRequestsPage() {
               <TBody>
                 {items.map((r) => (
                   <TR key={r.id}>
+                    <TD className="font-mono text-sm text-accent">{r.code || '—'}</TD>
                     <TD className="text-xs text-text-secondary">{formatRelative(r.createdAt)}</TD>
                     <TD className="text-right text-xs">
                       {r.items.length} · {r.items.reduce((a, i) => a + i.quantity, 0)} unid.

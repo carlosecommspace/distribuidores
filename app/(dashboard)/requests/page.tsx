@@ -17,6 +17,7 @@ interface RequestItem {
 }
 interface ProductRequest {
   id: string
+  code?: string | null
   status: string
   totalUSD: number
   paidUSD: number
@@ -93,6 +94,7 @@ export default function RequestsPage() {
             <Table>
               <THead>
                 <TR>
+                  <TH>Código</TH>
                   <TH>Fecha</TH>
                   <TH>Cliente</TH>
                   <TH className="text-right">Productos</TH>
@@ -107,6 +109,11 @@ export default function RequestsPage() {
                   const outstanding = Math.max(0, r.totalUSD - r.paidUSD)
                   return (
                     <TR key={r.id}>
+                      <TD>
+                        <Link href={`/requests/${r.id}`} className="font-mono text-sm text-accent hover:underline">
+                          {r.code || '—'}
+                        </Link>
+                      </TD>
                       <TD className="text-xs text-text-secondary">{formatRelative(r.createdAt)}</TD>
                       <TD>
                         <Link href={`/requests/${r.id}`} className="hover:text-accent">
