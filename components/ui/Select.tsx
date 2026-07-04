@@ -8,6 +8,8 @@ interface Props extends SelectHTMLAttributes<HTMLSelectElement> {
   error?: string
 }
 
+const CHEVRON = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A8A29E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`
+
 export const Select = forwardRef<HTMLSelectElement, Props>(
   ({ label, options, error, className, id, ...rest }, ref) => (
     <div className="flex flex-col gap-1.5">
@@ -20,13 +22,15 @@ export const Select = forwardRef<HTMLSelectElement, Props>(
         ref={ref}
         id={id}
         className={cn(
-          'input-base appearance-none pr-10 bg-no-repeat bg-[length:14px] bg-[position:right_12px_center] cursor-pointer',
+          'input-base appearance-none pr-10 cursor-pointer',
           error && 'border-danger',
           className,
         )}
         style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A8A29E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>\")",
+          backgroundImage: CHEVRON,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'right 12px center',
+          backgroundSize: '14px 14px',
         }}
         {...rest}
       >

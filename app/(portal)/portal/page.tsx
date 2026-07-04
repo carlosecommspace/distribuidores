@@ -17,14 +17,14 @@ export default async function PortalHomePage() {
   const client = await prisma.client.findUnique({
     where: { id: su.clientId },
     include: {
-      priceList: true,
       requests: { orderBy: { createdAt: 'desc' }, take: 5, include: { items: true } },
     },
   })
   if (!client) redirect('/login')
 
-  const pending = client.requests.filter((r) => r.status === 'pending').length
-  const fulfilled = client.requests.filter((r) => r.status === 'fulfilled').length
+  const openStatuses = new Set(['pending', 'partially_paid', 'paid'])
+  const pending = client.requests.filter((r) => openStatuses.has(r.status)).length
+  const fulfilled = client.requests.filter((r) => r.status === 'released' || r.status === 'fulfilled').length
 
   return (
     <div className="flex flex-col gap-6">
@@ -33,9 +33,7 @@ export default async function PortalHomePage() {
           Hola, {client.name}
         </h1>
         <p className="text-sm text-text-secondary mt-1">
-          {client.priceList
-            ? <>Tienes asignada la lista de precio <strong>{client.priceList.name}</strong>.</>
-            : 'Tus precios son los precios base del catálogo.'}
+          Bienvenido a tu portal de pedidos.
         </p>
       </div>
 
@@ -107,8 +105,10 @@ export default async function PortalHomePage() {
 }
 
 function statusBadge(s: string) {
-  if (s === 'pending') return <Badge tone="info">Pendiente</Badge>
-  if (s === 'fulfilled') return <Badge tone="success">Atendido</Badge>
+  if (s === 'pending') return <Badge tone="warning">Pendiente pago</Badge>
+  if (s === 'partially_paid') return <Badge tone="info">Pago parcial</Badge>
+  if (s === 'paid') return <Badge tone="success">Pagado</Badge>
+  if (s === 'released' || s === 'fulfilled') return <Badge tone="success">Liberado</Badge>
   if (s === 'cancelled') return <Badge tone="danger">Cancelado</Badge>
   return <Badge>{s}</Badge>
 }
