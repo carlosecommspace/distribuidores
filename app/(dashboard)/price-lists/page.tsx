@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
 import { toast } from '@/components/ui/Toast'
-import { formatUSD, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { Plus, Tag, ChevronRight } from 'lucide-react'
 
 interface PriceList {
@@ -95,7 +95,6 @@ export default function PriceListsPage() {
                   <TH>Creada</TH>
                   <TH className="text-right">Productos</TH>
                   <TH className="text-right">Clientes</TH>
-                  <TH className="text-right">Valor lista</TH>
                   <TH className="text-right">vs. base</TH>
                   <TH>Estado</TH>
                   <TH></TH>
@@ -116,9 +115,6 @@ export default function PriceListsPage() {
                       <TD className="text-xs text-text-secondary">{formatDate(l.createdAt)}</TD>
                       <TD className="text-right font-mono">{l._count.items}</TD>
                       <TD className="text-right font-mono">{l._count.clients}</TD>
-                      <TD className="text-right font-mono text-accent">
-                        {l._count.items > 0 ? formatUSD(l.totalListedUSD) : '—'}
-                      </TD>
                       <TD className={`text-right font-mono ${pctColor}`}>
                         {l._count.items > 0 ? `${pctSign}${l.avgDiscountPercent.toFixed(1)}%` : '—'}
                       </TD>
