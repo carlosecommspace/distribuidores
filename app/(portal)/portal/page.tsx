@@ -37,7 +37,7 @@ export default async function PortalHomePage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+      <div className="grid grid-cols-3 gap-3 md:gap-4">
         <Stat label="Pedidos pendientes" value={pending} accent />
         <Stat label="Pedidos atendidos" value={fulfilled} />
         <Stat label="Total pedidos" value={client.requests.length} />

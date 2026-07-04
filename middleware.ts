@@ -20,13 +20,18 @@ export default auth((req) => {
   }
 
   if (isAuth && role === 'client') {
-    const allowed = pathname.startsWith('/portal') || pathname.startsWith('/api/portal') || pathname.startsWith('/api/auth')
+    const allowed =
+      pathname.startsWith('/portal') ||
+      pathname.startsWith('/api/portal') ||
+      pathname.startsWith('/api/auth') ||
+      pathname.startsWith('/api/uploads') ||
+      pathname.startsWith('/print/portal')
     if (!allowed && !isPublic) {
       return NextResponse.redirect(new URL('/portal', req.nextUrl.origin))
     }
   }
 
-  if (isAuth && role !== 'client' && pathname.startsWith('/portal')) {
+  if (isAuth && role !== 'client' && (pathname.startsWith('/portal') || pathname.startsWith('/print/portal'))) {
     return NextResponse.redirect(new URL('/', req.nextUrl.origin))
   }
 

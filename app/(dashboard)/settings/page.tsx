@@ -231,6 +231,18 @@ export default function SettingsPage() {
         </Card>
 
         <Card>
+          <CardHeader><CardTitle>Métodos de pago del portal</CardTitle></CardHeader>
+          <CardBody className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-text-secondary">
+              Configura Zelle, Binance, transferencias y otros métodos que tus clientes verán al pagar desde el portal.
+            </p>
+            <a href="/settings/payment-methods">
+              <Button variant="secondary">Administrar</Button>
+            </a>
+          </CardBody>
+        </Card>
+
+        <Card>
           <CardHeader><CardTitle>WhatsApp</CardTitle></CardHeader>
           <CardBody>
             <Input

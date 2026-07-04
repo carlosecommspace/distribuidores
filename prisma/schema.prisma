@@ -29,6 +29,7 @@ model User {
   priceLists    PriceList[]
   requests      ProductRequest[]
   notifications Notification[]
+  paymentMethods PaymentMethod[]
   mlConnection  MLConnection?
   settings      Settings?
 }
@@ -46,6 +47,29 @@ model FileUpload {
 
   @@index([userId, createdAt])
   @@index([purpose])
+}
+
+model PaymentMethod {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type          String   // zelle, binance, bank_transfer_bs, bank_transfer_usd, cash_usd, cash_bs, other
+  label         String   // "Zelle Personal", "Cuenta Banesco Ahorro"
+  accountName   String?  // Titular
+  accountNumber String?  // Número de cuenta / email de Zelle / ID Binance
+  bankName      String?  // Solo para transferencias
+  documentId    String?  // C.I. o RIF del titular
+  currency      String   @default("USD") // USD | VES
+  instructions  String?  // Instrucciones opcionales para el cliente
+
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, isActive])
 }
 
 model Notification {
