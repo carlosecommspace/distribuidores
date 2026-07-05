@@ -70,6 +70,7 @@ export default auth((req) => {
 
   const publicPaths = [
     '/login',
+    '/vendedor', // login publico del vendedor (link que el merchant comparte)
     '/api/auth',
     '/catalogo',
     '/api/ml/webhook',
@@ -84,7 +85,7 @@ export default auth((req) => {
     return NextResponse.redirect(new URL('/login', req.nextUrl.origin))
   }
 
-  if (isAuth && pathname === '/login') {
+  if (isAuth && (pathname === '/login' || pathname === '/vendedor')) {
     const dest = role === 'client' ? '/portal' : role === 'seller' ? '/seller' : '/'
     return NextResponse.redirect(new URL(dest, req.nextUrl.origin))
   }
