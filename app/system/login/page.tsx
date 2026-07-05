@@ -15,7 +15,7 @@ export default function SystemLoginPage() {
   const [loading, setLoading] = useState(false)
 
   // El path externo (SUPERADMIN_URL_PATH) es el primer segmento de la URL, ya
-  // que el middleware reescribe /{env-path}/login -> /_system/login (el path
+  // que el middleware reescribe /{env-path}/login -> /system/login (el path
   // externo permanece en el browser).
   const externalBase = (() => {
     const parts = (pathname || '').split('/').filter(Boolean)

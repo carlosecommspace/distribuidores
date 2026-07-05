@@ -2,8 +2,8 @@ import { ToastViewport } from '@/components/ui/Toast'
 
 /**
  * Layout raiz del portal del superadmin. Sin auth guard aca — el guard esta
- * en app/_system/(authed)/layout.tsx que envuelve el dashboard y todas las
- * paginas post-login. app/_system/login/ vive fuera del guard.
+ * en app/system/(authed)/layout.tsx que envuelve el dashboard y todas las
+ * paginas post-login. app/system/login/ vive fuera del guard.
  */
 export default function SystemRootLayout({ children }: { children: React.ReactNode }) {
   // Si el path oculto no esta configurado, este layout tampoco deberia

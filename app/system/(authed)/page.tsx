@@ -51,7 +51,7 @@ export default function MerchantsPage() {
 
   const load = async () => {
     setLoading(true)
-    const r = await fetch('/api/_system/merchants')
+    const r = await fetch('/api/system/merchants')
     const d = await r.json()
     setMerchants(d.merchants || [])
     setLoading(false)
@@ -85,7 +85,7 @@ export default function MerchantsPage() {
       return
     }
     setCreating(true)
-    const r = await fetch('/api/_system/merchants', {
+    const r = await fetch('/api/system/merchants', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -110,7 +110,7 @@ export default function MerchantsPage() {
   const toggleActive = async (m: Merchant) => {
     const action = m.isActive ? 'suspender' : 'habilitar'
     if (!confirm(`¿${action.charAt(0).toUpperCase() + action.slice(1)} a ${m.name || m.email}?`)) return
-    const r = await fetch(`/api/_system/merchants/${m.id}`, {
+    const r = await fetch(`/api/system/merchants/${m.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ isActive: !m.isActive }),

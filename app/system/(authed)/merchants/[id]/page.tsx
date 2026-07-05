@@ -46,7 +46,7 @@ export default function MerchantDetailPage() {
 
   const load = async () => {
     setLoading(true)
-    const r = await fetch(`/api/_system/merchants/${params.id}`)
+    const r = await fetch(`/api/system/merchants/${params.id}`)
     if (r.ok) {
       const d = await r.json()
       setMerchant(d.merchant)
@@ -57,7 +57,7 @@ export default function MerchantDetailPage() {
   useEffect(() => { load() }, [params.id])
 
   const toggleActive = async (v: boolean) => {
-    const r = await fetch(`/api/_system/merchants/${params.id}`, {
+    const r = await fetch(`/api/system/merchants/${params.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ isActive: v }),

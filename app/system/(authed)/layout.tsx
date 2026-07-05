@@ -6,7 +6,7 @@ import { SignOutButton } from '@/components/auth/SignOutButton'
 
 /**
  * Guard de auth para el portal del superadmin. Todas las paginas dentro de
- * este grupo requieren role=superadmin. El login vive fuera (app/_system/login).
+ * este grupo requieren role=superadmin. El login vive fuera (app/system/login).
  */
 export default async function AuthedSystemLayout({ children }: { children: React.ReactNode }) {
   const path = process.env.SUPERADMIN_URL_PATH!
