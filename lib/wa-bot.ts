@@ -1,7 +1,42 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from './prisma'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// maxRetries: retry sobre 5xx/429/network. timeout: fallback si el stream se queda colgado.
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  maxRetries: 3,
+  timeout: 60_000,
+})
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+// El SDK reintenta errores de red pero a veces deja pasar ERR_STREAM_PREMATURE_CLOSE
+// (el body llega gzipped y se corta a mitad). Envolvemos con retry manual.
+async function callClaudeWithRetry(params: Anthropic.MessageCreateParamsNonStreaming, attempts = 3) {
+  let lastErr: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await client.messages.create(params)
+    } catch (e) {
+      lastErr = e
+      const msg = e instanceof Error ? e.message : String(e)
+      const code = (e as { code?: string })?.code || ''
+      const transient =
+        code === 'ERR_STREAM_PREMATURE_CLOSE' ||
+        code === 'ECONNRESET' ||
+        code === 'ETIMEDOUT' ||
+        code === 'UND_ERR_SOCKET' ||
+        /Premature close/i.test(msg) ||
+        /fetch failed/i.test(msg) ||
+        /socket hang up/i.test(msg)
+      if (!transient || i === attempts - 1) throw e
+      const backoff = 500 * Math.pow(2, i)
+      console.warn(`[wa-bot] Claude transient error (${code || msg}), retry ${i + 1}/${attempts - 1} in ${backoff}ms`)
+      await sleep(backoff)
+    }
+  }
+  throw lastErr
+}
 
 interface BotContext {
   userId: string
@@ -23,7 +58,10 @@ interface BotContext {
  *   - El bot decide escalar a humano (marca la conversación como necesita atención)
  */
 export async function generateBotReply(ctx: BotContext): Promise<{ reply: string } | { escalate: true; reason?: string } | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn('[wa-bot] ANTHROPIC_API_KEY no configurada — el bot no responde')
+    return null
+  }
 
   const [settings, contact, recentMessages] = await Promise.all([
     prisma.settings.findUnique({ where: { userId: ctx.userId } }),
@@ -82,7 +120,7 @@ export async function generateBotReply(ctx: BotContext): Promise<{ reply: string
   const systemPrompt = settings?.waAiPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
 
   try {
-    const response = await client.messages.create({
+    const response = await callClaudeWithRetry({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
       system: systemPrompt,
@@ -115,7 +153,12 @@ INSTRUCCIONES:
     }
     return { reply: text }
   } catch (e) {
-    console.error('[wa-bot] Claude error', e)
+    const err = e as { status?: number; message?: string; code?: string }
+    console.error('[wa-bot] Claude error', {
+      status: err.status,
+      code: err.code,
+      message: err.message,
+    })
     return null
   }
 }
