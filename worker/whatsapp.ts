@@ -362,7 +362,10 @@ async function handleIncomingMessage(
     where: { userId },
     select: { waAiEnabled: true },
   })
-  const shouldTriggerBot = contact.aiEnabled || (settings?.waAiEnabled && contact.aiEnabled)
+  // IA responde si:
+  //  - waAiEnabled global está ON (todos los chats), O
+  //  - la conversación individual tiene aiEnabled ON (override)
+  const shouldTriggerBot = settings?.waAiEnabled === true || contact.aiEnabled === true
   if (!shouldTriggerBot || !content) return
 
   try {
@@ -458,12 +461,37 @@ const server = createServer(async (req, res) => {
       const { to, content } = body
       if (!to || !content) return send(res, 400, { error: 'to and content required' })
       const sess = sessions.get(userId)
-      if (!sess?.sock || sess.status !== 'connected') {
-        return send(res, 400, { error: 'session not connected' })
+      if (!sess?.sock || sess.status !== 'connected' || !sess.sock.user) {
+        return send(res, 400, { error: 'session not connected', status: sess?.status })
       }
-      const jid = to.includes('@') ? to : `${to}@s.whatsapp.net`
-      const sent = await sess.sock.sendMessage(jid, { text: content })
-      return send(res, 200, { ok: true, externalId: sent?.key?.id || null })
+
+      // Normaliza el número: quita cualquier caracter no numérico
+      const rawNumber = to.includes('@') ? to.split('@')[0] : to
+      const phoneOnly = rawNumber.replace(/[^0-9]/g, '')
+      if (!phoneOnly) return send(res, 400, { error: 'invalid phone number' })
+
+      // Verifica que el número esté en WhatsApp y obtén el JID canónico
+      let jid = `${phoneOnly}@s.whatsapp.net`
+      try {
+        const check = await sess.sock.onWhatsApp(phoneOnly)
+        if (Array.isArray(check) && check.length > 0 && check[0].exists) {
+          jid = String(check[0].jid) || jid
+        } else {
+          log.warn({ userId, phone: phoneOnly }, 'number not on WhatsApp')
+          return send(res, 400, { error: 'El número no está en WhatsApp' })
+        }
+      } catch (err) {
+        log.warn({ err }, 'onWhatsApp check failed, sending anyway')
+      }
+
+      try {
+        const sent = await sess.sock.sendMessage(jid, { text: content })
+        log.info({ userId, jid, msgId: sent?.key?.id, msgStatus: sent?.status }, 'message sent')
+        return send(res, 200, { ok: true, externalId: sent?.key?.id || null, jid })
+      } catch (err) {
+        log.error({ err, userId, jid }, 'sendMessage failed')
+        return send(res, 500, { error: err instanceof Error ? err.message : 'send failed' })
+      }
     }
   }
 
