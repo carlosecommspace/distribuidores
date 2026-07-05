@@ -1,34 +1,74 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from './prisma'
 
-// maxRetries: retry sobre 5xx/429/network. timeout: fallback si el stream se queda colgado.
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  maxRetries: 3,
-  timeout: 60_000,
-})
+// Nota: NO usamos el SDK @anthropic-ai/sdk porque en Railway falla con
+// ERR_STREAM_PREMATURE_CLOSE (bug de node-fetch v2 leyendo respuestas gzipped).
+// Hacemos fetch nativo (undici) con accept-encoding: identity para saltarnos gzip.
+
+interface ClaudeMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+interface ClaudeResponse {
+  content: Array<{ type: string; text?: string }>
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-// El SDK reintenta errores de red pero a veces deja pasar ERR_STREAM_PREMATURE_CLOSE
-// (el body llega gzipped y se corta a mitad). Envolvemos con retry manual.
-async function callClaudeWithRetry(params: Anthropic.MessageCreateParamsNonStreaming, attempts = 3) {
+async function callClaude(params: {
+  model: string
+  max_tokens: number
+  system: string
+  messages: ClaudeMessage[]
+}, attempts = 3): Promise<ClaudeResponse> {
   let lastErr: unknown
   for (let i = 0; i < attempts; i++) {
     try {
-      return await client.messages.create(params)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 60_000)
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY!,
+          'anthropic-version': '2023-06-01',
+          // sin gzip: evita ERR_STREAM_PREMATURE_CLOSE del stream comprimido
+          'accept-encoding': 'identity',
+          accept: 'application/json',
+        },
+        body: JSON.stringify(params),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout))
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        const err = new Error(`Anthropic ${res.status}: ${text.slice(0, 300)}`) as Error & { status?: number }
+        err.status = res.status
+        // 429 / 5xx: retriable
+        if ((res.status === 429 || res.status >= 500) && i < attempts - 1) {
+          const backoff = 500 * Math.pow(2, i)
+          console.warn(`[wa-bot] Claude ${res.status}, retry ${i + 1}/${attempts - 1} in ${backoff}ms`)
+          await sleep(backoff)
+          continue
+        }
+        throw err
+      }
+      return (await res.json()) as ClaudeResponse
     } catch (e) {
       lastErr = e
       const msg = e instanceof Error ? e.message : String(e)
-      const code = (e as { code?: string })?.code || ''
+      const code = (e as { code?: string; cause?: { code?: string } })?.code
+        || (e as { cause?: { code?: string } })?.cause?.code
+        || ''
       const transient =
         code === 'ERR_STREAM_PREMATURE_CLOSE' ||
         code === 'ECONNRESET' ||
         code === 'ETIMEDOUT' ||
         code === 'UND_ERR_SOCKET' ||
+        code === 'UND_ERR_CONNECT_TIMEOUT' ||
         /Premature close/i.test(msg) ||
         /fetch failed/i.test(msg) ||
-        /socket hang up/i.test(msg)
+        /socket hang up/i.test(msg) ||
+        /aborted/i.test(msg)
       if (!transient || i === attempts - 1) throw e
       const backoff = 500 * Math.pow(2, i)
       console.warn(`[wa-bot] Claude transient error (${code || msg}), retry ${i + 1}/${attempts - 1} in ${backoff}ms`)
@@ -120,7 +160,7 @@ export async function generateBotReply(ctx: BotContext): Promise<{ reply: string
   const systemPrompt = settings?.waAiPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
 
   try {
-    const response = await callClaudeWithRetry({
+    const response = await callClaude({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
       system: systemPrompt,
@@ -144,7 +184,7 @@ INSTRUCCIONES:
       ],
     })
     const first = response.content[0]
-    if (!first || first.type !== 'text') return null
+    if (!first || first.type !== 'text' || !first.text) return null
     const text = first.text.trim()
 
     if (text.startsWith('ESCALATE')) {
