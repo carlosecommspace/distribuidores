@@ -72,7 +72,7 @@ export default async function CatalogoPage({ params }: Props) {
 
   return (
     <div id="top">
-      <Nav businessName={site.businessName} logoUrl={logoUrl} links={links} />
+      <Nav businessName={site.businessName} logoUrl={logoUrl} links={links} homeHref={home} />
 
       {/* Header de la página */}
       <section className="ms-cat-header">

@@ -10,9 +10,11 @@ interface Props {
   businessName: string
   logoUrl: string | null
   links: NavLink[]
+  /** URL a la que apunta el logo/nombre. En el home usar "#top", en otras rutas la URL del home. */
+  homeHref: string
 }
 
-export function Nav({ businessName, logoUrl, links }: Props) {
+export function Nav({ businessName, logoUrl, links, homeHref }: Props) {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -32,7 +34,7 @@ export function Nav({ businessName, logoUrl, links }: Props) {
   return (
     <header className={`ms-nav-wrap${scrolled ? ' ms-nav-scrolled' : ''}`}>
       <div className="ms-nav">
-        <a href="#top" className="ms-nav-brand" onClick={() => setOpen(false)}>
+        <a href={homeHref} className="ms-nav-brand" onClick={() => setOpen(false)}>
           {logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt={businessName} />

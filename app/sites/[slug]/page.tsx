@@ -50,7 +50,7 @@ export default async function SitePage({ params }: Props) {
 
   return (
     <div id="top">
-      <Nav businessName={site.businessName} logoUrl={logoUrl} links={links} />
+      <Nav businessName={site.businessName} logoUrl={logoUrl} links={links} homeHref="#top" />
 
       {/* Hero */}
       <section className="ms-hero">
