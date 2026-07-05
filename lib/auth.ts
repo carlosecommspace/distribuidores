@@ -28,9 +28,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Gate global: usuarios suspendidos por el superadmin no logean
         if (!user.isActive) return null
 
-        // Vendedor suspendido no puede loguear
-        if (user.role === 'seller' && user.sellerProfile && !user.sellerProfile.isActive) {
-          return null
+        // Vendedor: rechazar si no tiene perfil o esta suspendido
+        if (user.role === 'seller') {
+          if (!user.sellerProfile) return null
+          if (!user.sellerProfile.isActive) return null
         }
 
         return {
