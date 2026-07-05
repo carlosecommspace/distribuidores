@@ -1,16 +1,35 @@
 import { prisma } from './prisma'
+import { codePrefix, nextRequestCode } from './requests'
+import { notify } from './notifications'
 
 // Nota: NO usamos el SDK @anthropic-ai/sdk porque en Railway falla con
 // ERR_STREAM_PREMATURE_CLOSE (bug de node-fetch v2 leyendo respuestas gzipped).
 // Hacemos fetch nativo (undici) con accept-encoding: identity para saltarnos gzip.
 
+type TextBlock = { type: 'text'; text: string }
+type ToolUseBlock = { type: 'tool_use'; id: string; name: string; input: unknown }
+type ToolResultBlock = {
+  type: 'tool_result'
+  tool_use_id: string
+  content: string
+  is_error?: boolean
+}
+type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock
+
 interface ClaudeMessage {
   role: 'user' | 'assistant'
-  content: string
+  content: string | ContentBlock[]
+}
+
+interface ClaudeTool {
+  name: string
+  description: string
+  input_schema: Record<string, unknown>
 }
 
 interface ClaudeResponse {
-  content: Array<{ type: string; text?: string }>
+  content: ContentBlock[]
+  stop_reason?: string
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -20,6 +39,7 @@ async function callClaude(params: {
   max_tokens: number
   system: string
   messages: ClaudeMessage[]
+  tools?: ClaudeTool[]
 }, attempts = 3): Promise<ClaudeResponse> {
   let lastErr: unknown
   for (let i = 0; i < attempts; i++) {
@@ -32,7 +52,6 @@ async function callClaude(params: {
           'content-type': 'application/json',
           'x-api-key': process.env.ANTHROPIC_API_KEY!,
           'anthropic-version': '2023-06-01',
-          // sin gzip: evita ERR_STREAM_PREMATURE_CLOSE del stream comprimido
           'accept-encoding': 'identity',
           accept: 'application/json',
         },
@@ -43,7 +62,6 @@ async function callClaude(params: {
         const text = await res.text().catch(() => '')
         const err = new Error(`Anthropic ${res.status}: ${text.slice(0, 300)}`) as Error & { status?: number }
         err.status = res.status
-        // 429 / 5xx: retriable
         if ((res.status === 429 || res.status >= 500) && i < attempts - 1) {
           const backoff = 500 * Math.pow(2, i)
           console.warn(`[wa-bot] Claude ${res.status}, retry ${i + 1}/${attempts - 1} in ${backoff}ms`)
@@ -85,19 +103,197 @@ interface BotContext {
   contactName: string | null
 }
 
-/**
- * Genera una respuesta del bot para un mensaje entrante.
- * Considera:
- *   - Prompt custom del sistema (Settings.waAiPrompt)
- *   - Cliente vinculado (si aplica) — nombre, empresa, lista de precio, últimos pedidos
- *   - Últimos ~10 mensajes de la conversación
- *   - Catálogo resumido (top 30 productos por venta)
- *
- * Devuelve null si:
- *   - No hay ANTHROPIC_API_KEY
- *   - El bot decide escalar a humano (marca la conversación como necesita atención)
- */
-export async function generateBotReply(ctx: BotContext): Promise<{ reply: string } | { escalate: true; reason?: string } | null> {
+// ---------------------------------------------------------------------------
+// Tool: create_order
+// ---------------------------------------------------------------------------
+
+const CREATE_ORDER_TOOL: ClaudeTool = {
+  name: 'create_order',
+  description:
+    'Crea un pedido en el sistema en estado pendiente de pago. Úsalo SOLO cuando el cliente ha confirmado explícitamente qué productos y cantidades quiere ordenar. Después de crearlo, el sistema te devuelve un mensaje ya redactado para enviar al cliente — reenvíalo tal cual, sin agregar precios o links que no aparezcan ahí.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      items: {
+        type: 'array',
+        description: 'Lista de productos a incluir en el pedido.',
+        items: {
+          type: 'object',
+          properties: {
+            sku: { type: 'string', description: 'SKU exacto del producto tal como aparece en el catálogo.' },
+            quantity: { type: 'integer', minimum: 1, description: 'Cantidad de unidades solicitadas.' },
+          },
+          required: ['sku', 'quantity'],
+        },
+        minItems: 1,
+      },
+      notes: {
+        type: 'string',
+        description: 'Notas opcionales del cliente sobre el pedido (entrega, preferencias, etc.).',
+      },
+    },
+    required: ['items'],
+  },
+}
+
+interface OrderToolInput {
+  items: Array<{ sku: string; quantity: number }>
+  notes?: string
+}
+
+interface OrderToolResult {
+  ok: boolean
+  error?: string
+  message_for_customer?: string
+  code?: string
+  outOfStock?: Array<{ sku: string; requested: number; available: number }>
+  unknownSkus?: string[]
+}
+
+async function executeCreateOrder(ctx: BotContext, input: OrderToolInput): Promise<OrderToolResult> {
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    return { ok: false, error: 'items vacío' }
+  }
+
+  const contact = await prisma.whatsAppContact.findUnique({
+    where: { id: ctx.contactId },
+    include: { client: true },
+  })
+  if (!contact) return { ok: false, error: 'Contacto no existe' }
+
+  const skus = Array.from(new Set(input.items.map((i) => i.sku)))
+  const products = await prisma.product.findMany({
+    where: { userId: ctx.userId, sku: { in: skus }, isActive: true },
+    select: { id: true, sku: true, name: true, priceUSD: true, stock: true },
+  })
+  const bySku = new Map(products.map((p) => [p.sku, p]))
+
+  const unknownSkus = skus.filter((s) => !bySku.has(s))
+  if (unknownSkus.length > 0) return { ok: false, error: 'SKUs desconocidos', unknownSkus }
+
+  // Consolidar por SKU
+  const merged = new Map<string, number>()
+  for (const it of input.items) {
+    merged.set(it.sku, (merged.get(it.sku) || 0) + Math.max(1, Math.floor(it.quantity)))
+  }
+
+  const outOfStock: Array<{ sku: string; requested: number; available: number }> = []
+  for (const [sku, qty] of merged) {
+    const p = bySku.get(sku)!
+    if (qty > p.stock) outOfStock.push({ sku, requested: qty, available: p.stock })
+  }
+  if (outOfStock.length > 0) return { ok: false, error: 'Stock insuficiente', outOfStock }
+
+  // Precios: si el contacto tiene cliente con lista, aplicarla
+  let priceOverrides = new Map<string, number>()
+  if (contact.client?.priceListId) {
+    const items = await prisma.priceListItem.findMany({
+      where: {
+        priceListId: contact.client.priceListId,
+        productId: { in: products.map((p) => p.id) },
+      },
+      select: { productId: true, priceUSD: true },
+    })
+    priceOverrides = new Map(items.map((i) => [i.productId, i.priceUSD]))
+  }
+
+  const lineItems = Array.from(merged).map(([sku, qty]) => {
+    const p = bySku.get(sku)!
+    const priceUSD = priceOverrides.get(p.id) ?? p.priceUSD
+    return {
+      productId: p.id,
+      quantity: qty,
+      priceUSD,
+      subtotalUSD: priceUSD * qty,
+    }
+  })
+  const totalUSD = lineItems.reduce((s, x) => s + x.subtotalUSD, 0)
+
+  // Resolver cliente: si el contacto no está vinculado, crear uno tipo "wa_lead"
+  const wasRegisteredClient = !!contact.client
+  let clientId = contact.clientId
+  if (!clientId) {
+    const displayName = ctx.contactName || contact.name || `WhatsApp +${ctx.contactPhone}`
+    const newClient = await prisma.client.create({
+      data: {
+        userId: ctx.userId,
+        name: displayName,
+        phone: ctx.contactPhone,
+        type: 'wa_lead',
+        notes: 'Cliente creado automáticamente desde un pedido por WhatsApp.',
+      },
+    })
+    clientId = newClient.id
+    await prisma.whatsAppContact.update({
+      where: { id: contact.id },
+      data: { clientId: newClient.id },
+    })
+  }
+
+  // Código correlativo del pedido
+  const owner = await prisma.user.findUnique({
+    where: { id: ctx.userId },
+    select: { company: true, name: true },
+  })
+  const prefix = codePrefix(owner?.company, owner?.name)
+
+  let created: { id: string; code: string | null } | null = null
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = await nextRequestCode(ctx.userId, prefix)
+    try {
+      created = await prisma.productRequest.create({
+        data: {
+          userId: ctx.userId,
+          clientId,
+          code,
+          status: 'pending',
+          notes: input.notes || 'Pedido generado por IA desde WhatsApp',
+          totalUSD,
+          items: { create: lineItems },
+        },
+        select: { id: true, code: true },
+      })
+      break
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg.includes('Unique') || msg.includes('P2002')) continue
+      throw e
+    }
+  }
+  if (!created) return { ok: false, error: 'No se pudo generar código único' }
+
+  // Notificar al admin
+  await notify({
+    userId: ctx.userId,
+    type: 'new_request',
+    severity: 'info',
+    title: `Nuevo pedido ${created.code} generado por IA vía WhatsApp`,
+    body: `${lineItems.length} ${lineItems.length === 1 ? 'producto' : 'productos'} · Total $${totalUSD.toFixed(2)} USD · ${wasRegisteredClient ? 'Cliente registrado' : 'Lead nuevo — requiere contacto de ventas'}`,
+    link: `/requests/${created.id}`,
+    resourceType: 'request',
+    resourceId: created.id,
+    dedup: false,
+  }).catch((e) => console.error('[wa-bot] notify failed', e))
+
+  const totalStr = `$${totalUSD.toFixed(2)} USD`
+  if (wasRegisteredClient) {
+    const base = (process.env.APP_PUBLIC_URL || process.env.NEXTAUTH_URL || '').replace(/\/$/, '')
+    const link = base ? `${base}/portal/requests/${created.id}` : `/portal/requests/${created.id}`
+    const message = `¡Listo! Registré tu pedido ${created.code} por ${totalStr}, en estado pendiente de pago.\n\nIngresa a tu portal para ver el detalle y registrar el pago:\n${link}`
+    return { ok: true, code: created.code || undefined, message_for_customer: message }
+  } else {
+    const message = `¡Listo! Registré tu pedido ${created.code} por ${totalStr}, en estado pendiente de pago.\n\nComo aún no tienes cuenta en nuestro portal, un miembro de nuestro equipo de ventas te contactará muy pronto para coordinar el pago y la entrega.`
+    return { ok: true, code: created.code || undefined, message_for_customer: message }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bot loop
+// ---------------------------------------------------------------------------
+
+export async function generateBotReply(
+  ctx: BotContext,
+): Promise<{ reply: string } | { escalate: true; reason?: string } | null> {
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn('[wa-bot] ANTHROPIC_API_KEY no configurada — el bot no responde')
     return null
@@ -118,26 +314,12 @@ export async function generateBotReply(ctx: BotContext): Promise<{ reply: string
 
   if (!contact) return null
 
-  // Resumen del catálogo — top 30 productos activos con stock
   const products = await prisma.product.findMany({
     where: { userId: ctx.userId, isActive: true, stock: { gt: 0 } },
     select: { sku: true, name: true, priceUSD: true, stock: true, unit: true, category: true },
     orderBy: [{ updatedAt: 'desc' }],
     take: 30,
   })
-
-  // Aplicar precios de la lista del cliente si existe
-  let overrides = new Map<string, number>()
-  if (contact.client?.priceListId) {
-    const items = await prisma.priceListItem.findMany({
-      where: { priceListId: contact.client.priceListId },
-      select: { productId: true, priceUSD: true },
-    })
-    // Necesitaríamos mapear por productId — para el bot, es OK usar priceUSD del producto por ahora
-    // (fuera del scope de este MVP; la lista se aplica cuando cotiza explícito)
-    void items // reservado
-    void overrides
-  }
 
   const catalogText = products.length === 0
     ? 'Catálogo vacío por ahora.'
@@ -159,15 +341,7 @@ export async function generateBotReply(ctx: BotContext): Promise<{ reply: string
 
   const systemPrompt = settings?.waAiPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
 
-  try {
-    const response = await callClaude({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: `${clientBlock}
+  const initialUserMessage = `${clientBlock}
 
 CATÁLOGO ACTUAL (parcial):
 ${catalogText}
@@ -176,22 +350,78 @@ HISTORIAL DE LA CONVERSACIÓN (más reciente al final):
 ${conversationText}
 
 INSTRUCCIONES:
-- Si puedes ayudar con precio/disponibilidad/pedidos, responde directamente en español, breve, tono profesional.
+- Si el cliente pide precio/disponibilidad, responde directamente en español, breve, tono profesional.
+- Si el cliente CONFIRMA un pedido (te dice qué productos y cantidades quiere ordenar de manera clara), usa la herramienta "create_order" para registrarlo. NO uses la herramienta hasta que el cliente haya confirmado — primero cotiza, aclara dudas y confirma.
+- Cuando uses create_order y devuelva "message_for_customer", envía EXACTAMENTE ese texto al cliente (puedes agregar un saludo corto si quieres, pero no cambies el código, monto ni link).
+- Si el pedido falla por stock o SKU desconocido, informa al cliente en lenguaje natural (no menciones "SKU", di el nombre del producto).
 - Si el cliente pide algo que requiere confirmación humana (descuentos especiales, entregas urgentes, cambios de política), responde con la palabra literal "ESCALATE" seguida de dos puntos y una razón corta. Ej: "ESCALATE: pide descuento no autorizado".
 - No inventes precios ni stock. Si no estás seguro, ESCALATE.
-- Responde SOLO con el texto que enviarías al cliente, sin metadata.`,
-        },
-      ],
-    })
-    const first = response.content[0]
-    if (!first || first.type !== 'text' || !first.text) return null
-    const text = first.text.trim()
+- Responde SOLO con el texto que enviarías al cliente, sin metadata.`
 
-    if (text.startsWith('ESCALATE')) {
-      const reason = text.replace(/^ESCALATE:?\s*/i, '').trim()
-      return { escalate: true, reason: reason || undefined }
+  const messages: ClaudeMessage[] = [{ role: 'user', content: initialUserMessage }]
+
+  try {
+    // Loop de tool use — máximo 3 rondas de tools para evitar loops.
+    for (let round = 0; round < 4; round++) {
+      const response = await callClaude({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 600,
+        system: systemPrompt,
+        tools: [CREATE_ORDER_TOOL],
+        messages,
+      })
+
+      const toolUses = response.content.filter((b): b is ToolUseBlock => b.type === 'tool_use')
+
+      if (response.stop_reason === 'tool_use' && toolUses.length > 0) {
+        // Agregar la respuesta del assistant al historial
+        messages.push({ role: 'assistant', content: response.content })
+
+        // Ejecutar cada tool y armar tool_results
+        const toolResults: ToolResultBlock[] = []
+        for (const tu of toolUses) {
+          if (tu.name === 'create_order') {
+            try {
+              const result = await executeCreateOrder(ctx, tu.input as OrderToolInput)
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: tu.id,
+                content: JSON.stringify(result),
+                is_error: !result.ok,
+              })
+            } catch (e) {
+              console.error('[wa-bot] create_order failed', e)
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: tu.id,
+                content: JSON.stringify({ ok: false, error: 'Error interno creando el pedido' }),
+                is_error: true,
+              })
+            }
+          } else {
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: tu.id,
+              content: JSON.stringify({ ok: false, error: `Tool desconocida: ${tu.name}` }),
+              is_error: true,
+            })
+          }
+        }
+        messages.push({ role: 'user', content: toolResults })
+        continue
+      }
+
+      // Respuesta final de texto
+      const textBlock = response.content.find((b): b is TextBlock => b.type === 'text' && !!b.text)
+      if (!textBlock) return null
+      const text = textBlock.text.trim()
+      if (text.startsWith('ESCALATE')) {
+        const reason = text.replace(/^ESCALATE:?\s*/i, '').trim()
+        return { escalate: true, reason: reason || undefined }
+      }
+      return { reply: text }
     }
-    return { reply: text }
+    return null
   } catch (e) {
     const err = e as { status?: number; message?: string; code?: string }
     console.error('[wa-bot] Claude error', {
@@ -203,4 +433,4 @@ INSTRUCCIONES:
   }
 }
 
-const DEFAULT_SYSTEM_PROMPT = `Eres el asistente virtual del vendedor de una distribuidora venezolana profesional. Respondes por WhatsApp a clientes con tono cercano pero conciso. Nunca inventas información. Cuando dudes, escalas a un humano.`
+const DEFAULT_SYSTEM_PROMPT = `Eres el asistente virtual de ventas de una distribuidora venezolana profesional. Respondes por WhatsApp a clientes con tono cercano pero conciso. Nunca inventas información. Puedes registrar pedidos en el sistema usando la herramienta create_order cuando el cliente confirma. Cuando dudes, escalas a un humano.`
