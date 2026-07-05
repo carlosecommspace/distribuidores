@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
   if (data.priceListId) {
     const ok = await prisma.priceList.findFirst({ where: { id: data.priceListId, userId } })
-    if (!ok) return NextResponse.json({ error: 'Lista de precio no encontrada' }, { status: 400 })
+    if (!ok) return NextResponse.json({ error: 'Lista de precios no encontrada' }, { status: 400 })
   }
 
   const client = await prisma.client.create({

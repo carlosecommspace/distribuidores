@@ -36,7 +36,7 @@ export async function GET(req: Request) {
   const q = searchParams.get('q') || ''
   const clientId = searchParams.get('clientId') || undefined
 
-  // Resolver lista de precio del cliente si aplica. El cliente debe pertenecer
+  // Resolver lista de precios del cliente si aplica. El cliente debe pertenecer
   // al mismo tenant.
   let priceMap = new Map<string, number>()
   let priceListName: string | null = null

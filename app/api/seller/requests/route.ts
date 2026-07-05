@@ -83,7 +83,7 @@ export async function POST(req: Request) {
   const validItems = items.filter((i) => productMap.has(i.productId))
   if (validItems.length === 0) return NextResponse.json({ error: 'no valid products' }, { status: 400 })
 
-  // Aplicar lista de precio del cliente
+  // Aplicar lista de precios del cliente
   let overrides = new Map<string, number>()
   if (client.priceListId) {
     const pls = await prisma.priceListItem.findMany({

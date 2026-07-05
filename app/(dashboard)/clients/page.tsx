@@ -130,7 +130,7 @@ export default function ClientsPage() {
                   <TH>Empresa</TH>
                   <TH>Teléfono</TH>
                   <TH>Tipo</TH>
-                  <TH>Lista de precio</TH>
+                  <TH>Lista de precios</TH>
                   <TH className="text-right">Total comprado</TH>
                   <TH>Última compra</TH>
                 </TR>
@@ -200,7 +200,7 @@ export default function ClientsPage() {
             ]}
           />
           <Select
-            label="Lista de precio (acuerdo)"
+            label="Lista de precios (acuerdo)"
             value={form.priceListId}
             onChange={(e) => setForm({ ...form, priceListId: e.target.value })}
             options={[

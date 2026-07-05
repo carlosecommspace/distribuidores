@@ -142,7 +142,7 @@ export default function MyClientsPage() {
                 <TR>
                   <TH>Cliente</TH>
                   <TH>Contacto</TH>
-                  <TH>Lista de precio</TH>
+                  <TH>Lista de precios</TH>
                   <TH className="text-right">Compras acumuladas</TH>
                   <TH></TH>
                 </TR>
@@ -207,7 +207,7 @@ export default function MyClientsPage() {
           </div>
           <div className="md:col-span-2">
             <Select
-              label="Lista de precio"
+              label="Lista de precios"
               value={form.priceListId}
               onChange={(e) => setForm({ ...form, priceListId: e.target.value })}
               options={[

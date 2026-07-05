@@ -65,7 +65,7 @@ export default function PriceListsPage() {
   return (
     <div>
       <PageHeader
-        title="Listas de precio"
+        title="Listas de precios"
         subtitle={`${items.length} ${items.length === 1 ? 'lista' : 'listas'} configuradas`}
         actions={
           <Button onClick={() => setOpen(true)}>
@@ -83,7 +83,7 @@ export default function PriceListsPage() {
           ) : items.length === 0 ? (
             <EmptyState
               icon={<Tag size={32} />}
-              title="No hay listas de precio"
+              title="No hay listas de precios"
               description="Crea una lista (ej. Mayorista, Distribuidor) y asígnala a tus clientes para que vean precios custom."
               action={<Button onClick={() => setOpen(true)}><Plus size={16} /> Nueva lista</Button>}
             />
@@ -136,7 +136,7 @@ export default function PriceListsPage() {
       <Modal
         open={open}
         onOpenChange={setOpen}
-        title="Nueva lista de precio"
+        title="Nueva lista de precios"
         size="md"
         footer={
           <>
