@@ -59,6 +59,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         data: {
           userId,
           clientId: request.clientId,
+          // Si el pedido fue colocado por un vendedor, atribuimos la venta a el
+          sellerId: request.sellerId || undefined,
           channel: 'portal',
           paymentMethod: 'mixed',
           paymentStatus: 'paid',
