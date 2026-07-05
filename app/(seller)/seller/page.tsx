@@ -13,20 +13,28 @@ import { Users, Inbox, TrendingUp, Plus } from 'lucide-react'
 export default async function SellerHomePage() {
   const session = await auth()
   if (!session?.user) redirect('/login')
-  const su = session.user as { sellerId?: string }
-  if (!su.sellerId) redirect('/login')
+  const su = session.user as { id?: string; sellerId?: string }
+  if (!su.id) redirect('/login')
+
+  // Resolver sellerId desde la sesion, con fallback a userId
+  let sellerId = su.sellerId
+  if (!sellerId) {
+    const s = await prisma.seller.findFirst({ where: { userId: su.id }, select: { id: true } })
+    sellerId = s?.id
+  }
+  if (!sellerId) redirect('/login')
 
   const [seller, clientsCount, requestsCount, sales, recentRequests] = await Promise.all([
-    prisma.seller.findUnique({ where: { id: su.sellerId }, select: { name: true } }),
-    prisma.sellerClient.count({ where: { sellerId: su.sellerId } }),
-    prisma.productRequest.count({ where: { sellerId: su.sellerId } }),
+    prisma.seller.findUnique({ where: { id: sellerId }, select: { name: true } }),
+    prisma.sellerClient.count({ where: { sellerId } }),
+    prisma.productRequest.count({ where: { sellerId } }),
     prisma.sale.aggregate({
-      where: { sellerId: su.sellerId },
+      where: { sellerId },
       _count: true,
       _sum: { totalUSD: true },
     }),
     prisma.productRequest.findMany({
-      where: { sellerId: su.sellerId },
+      where: { sellerId },
       include: { client: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
       take: 5,

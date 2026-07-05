@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import { Home, Users, Inbox, User } from 'lucide-react'
+import { Home, Users, Inbox, User, AlertCircle } from 'lucide-react'
 import { ToastViewport } from '@/components/ui/Toast'
 import { PortalNavLink } from '@/components/portal/PortalNavLink'
 import { SignOutButton } from '@/components/auth/SignOutButton'
@@ -11,16 +11,63 @@ export default async function SellerLayout({ children }: { children: React.React
   const session = await auth()
   if (!session?.user) redirect('/login')
   const su = session.user as { id?: string; role?: string; sellerId?: string }
-  if (su.role !== 'seller' || !su.sellerId) redirect('/')
 
-  const seller = await prisma.seller.findUnique({
-    where: { id: su.sellerId },
-    select: { id: true, name: true, isActive: true, owner: { select: { name: true, company: true } } },
-  })
-  if (!seller) redirect('/login')
+  // Rol distinto de seller: fuera del portal. Middleware ya redirige, pero
+  // por si acaso lo empujamos al home del admin (o /login si no tiene id).
+  if (su.role !== 'seller' || !su.id) redirect('/')
 
-  // Doble check: si el admin lo suspendio despues del login, deslogueamos
-  if (!seller.isActive) redirect('/login?suspended=1')
+  // Resolver el perfil de vendedor. Preferimos sellerId de la sesion, pero
+  // caemos al lookup por userId si el JWT viejo/incompleto no lo trae
+  // (evita loop de redireccion si la sesion se emitio antes del feature).
+  const seller = su.sellerId
+    ? await prisma.seller.findUnique({
+        where: { id: su.sellerId },
+        select: { id: true, name: true, isActive: true, owner: { select: { name: true, company: true } } },
+      })
+    : await prisma.seller.findFirst({
+        where: { userId: su.id },
+        select: { id: true, name: true, isActive: true, owner: { select: { name: true, company: true } } },
+      })
+
+  // Edge case: role=seller sin sellerProfile en DB. Renderizamos una pagina de
+  // error con boton de logout — NO redirect, para no entrar en loop con el
+  // middleware que empuja a los seller a /seller.
+  if (!seller) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bg p-4">
+        <div className="max-w-md w-full text-center">
+          <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-danger-subtle text-danger mb-4">
+            <AlertCircle size={22} />
+          </div>
+          <h1 className="text-xl font-display font-semibold mb-2">Perfil de vendedor no encontrado</h1>
+          <p className="text-sm text-text-secondary mb-6">
+            Tu cuenta tiene rol de vendedor pero no encontramos su perfil. Contacta a tu administrador o inicia sesión de nuevo.
+          </p>
+          <SignOutButton size={14} className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border bg-surface hover:bg-surface-2 text-sm text-text-primary" />
+        </div>
+        <ToastViewport />
+      </div>
+    )
+  }
+
+  // Suspendido: pagina bloqueo con logout (NO redirect a /login por loop).
+  if (!seller.isActive) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bg p-4">
+        <div className="max-w-md w-full text-center">
+          <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-warning-subtle text-warning mb-4">
+            <AlertCircle size={22} />
+          </div>
+          <h1 className="text-xl font-display font-semibold mb-2">Tu cuenta está suspendida</h1>
+          <p className="text-sm text-text-secondary mb-6">
+            Tu administrador ha suspendido temporalmente el acceso al portal. Contactalo para reactivarla.
+          </p>
+          <SignOutButton size={14} className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border bg-surface hover:bg-surface-2 text-sm text-text-primary" />
+        </div>
+        <ToastViewport />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-bg">
