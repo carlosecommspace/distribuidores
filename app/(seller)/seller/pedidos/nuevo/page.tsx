@@ -22,6 +22,9 @@ interface Product {
   stock: number
   unit: string
   category: string | null
+  effectivePrice?: number
+  hasListPrice?: boolean
+  basePrice?: number
 }
 interface LineItem {
   productId: string
@@ -47,6 +50,7 @@ export default function NewOrderPage() {
   const [items, setItems] = useState<LineItem[]>([])
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [priceListName, setPriceListName] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/seller/clients').then((r) => r.json()).then((d) => {
@@ -58,10 +62,20 @@ export default function NewOrderPage() {
   useEffect(() => {
     if (!clientId) return
     setLoadingProducts(true)
-    fetch(`/api/products/search?q=${encodeURIComponent(productQuery)}`)
+    const url = new URL('/api/products/search', window.location.origin)
+    url.searchParams.set('q', productQuery)
+    url.searchParams.set('clientId', clientId) // aplica lista de precio del cliente
+    fetch(url.toString())
       .then((r) => r.json())
       .then((d) => {
-        setProducts(Array.isArray(d) ? d : [])
+        // API devuelve {products, priceListName}. Retrocompat con array crudo.
+        if (Array.isArray(d)) {
+          setProducts(d)
+          setPriceListName(null)
+        } else {
+          setProducts(d.products || [])
+          setPriceListName(d.priceListName || null)
+        }
         setLoadingProducts(false)
       })
       .catch(() => setLoadingProducts(false))
@@ -88,7 +102,7 @@ export default function NewOrderPage() {
           name: p.name,
           sku: p.sku,
           quantity: 1,
-          priceUSD: p.priceUSD,
+          priceUSD: p.effectivePrice ?? p.priceUSD,
           stock: p.stock,
           unit: p.unit,
         },
@@ -183,16 +197,25 @@ export default function NewOrderPage() {
                     className="pl-9"
                   />
                 </div>
+                {priceListName && (
+                  <div className="text-xs text-accent bg-accent-subtle border border-accent-border rounded-md px-2.5 py-1.5">
+                    Precios de la lista <strong>{priceListName}</strong> del cliente
+                  </div>
+                )}
                 {loadingProducts ? (
                   <div className="flex flex-col gap-2">
                     {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12" />)}
                   </div>
                 ) : products.length === 0 ? (
-                  <div className="text-sm text-text-muted text-center py-4">Sin resultados</div>
+                  <div className="text-sm text-text-muted text-center py-4">
+                    {productQuery ? 'Sin resultados' : 'Empieza a escribir para buscar productos o dejalo vacío para ver los últimos 30.'}
+                  </div>
                 ) : (
                   <ul className="border border-border rounded-md divide-y divide-border max-h-[400px] overflow-y-auto">
                     {products.slice(0, 30).map((p) => {
                       const outOfStock = p.stock <= 0
+                      const price = p.effectivePrice ?? p.priceUSD
+                      const hasListPrice = !!p.hasListPrice && p.basePrice !== undefined && p.basePrice !== price
                       return (
                         <li key={p.id}>
                           <button
@@ -203,8 +226,17 @@ export default function NewOrderPage() {
                           >
                             <div className="flex-1 min-w-0">
                               <div className="text-sm text-text-primary truncate">{p.name}</div>
-                              <div className="text-xs text-text-muted font-mono">
-                                {p.sku} · {formatUSD(p.priceUSD)} · stock {p.stock} {p.unit}
+                              <div className="text-xs text-text-muted font-mono flex items-center gap-2 flex-wrap">
+                                <span>{p.sku}</span>
+                                <span>·</span>
+                                <span className={hasListPrice ? 'text-accent' : ''}>
+                                  {formatUSD(price)}
+                                  {hasListPrice && p.basePrice !== undefined && (
+                                    <span className="ml-1 text-text-muted line-through">{formatUSD(p.basePrice)}</span>
+                                  )}
+                                </span>
+                                <span>·</span>
+                                <span>stock {p.stock} {p.unit}</span>
                               </div>
                             </div>
                             {outOfStock ? (
