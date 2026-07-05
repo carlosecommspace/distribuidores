@@ -34,6 +34,8 @@ model User {
   waContacts    WhatsAppContact[]
   mlConnection  MLConnection?
   settings      Settings?
+  merchantSite  MerchantSite?
+  websiteLeads  WebsiteLead[]
 }
 
 model FileUpload {
@@ -516,6 +518,65 @@ model WhatsAppContact {
   @@unique([userId, phoneNumber])
   @@index([userId, lastMessageAt])
   @@index([clientId])
+}
+
+// -----------------------------------------------------------------------------
+// MerchantSite — sitio web publico del merchant en {slug}.APP_ROOT_DOMAIN.
+// Un sitio por tenant. Contiene branding, textos, template, y assets como IDs
+// de FileUpload. WebsiteLead son los mensajes que llegan del formulario.
+// -----------------------------------------------------------------------------
+
+model MerchantSite {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  slug           String   @unique // subdominio: {slug}.APP_ROOT_DOMAIN
+  isPublished    Boolean  @default(false)
+
+  template       String   @default("modern") // modern | warm | minimal
+  colorPrimary   String   @default("#F5A623") // acento principal (botones, links)
+  colorAccent    String   @default("#0F0F0F") // fondo/oscuro
+  colorNeutral   String   @default("#F4F1EA") // fondo claro/backgrounds
+
+  businessName   String
+  tagline        String?
+  mission        String?
+  vision         String?
+  description    String?
+
+  contactEmail   String?
+  contactPhone   String?
+  contactAddress String?
+
+  logoFileId     String?  // FileUpload id
+  imageFileIds   String[] // 4-7 FileUpload ids en orden
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  leads          WebsiteLead[]
+
+  @@index([slug])
+}
+
+model WebsiteLead {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      MerchantSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  userId    String   // duplicado para query por tenant
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  email     String?
+  phone     String?
+  message   String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([siteId, createdAt])
+  @@index([userId, readAt])
 }
 
 model WhatsAppMessage {
