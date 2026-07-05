@@ -70,9 +70,16 @@ export default function SellersPage() {
     load()
   }
 
+  const sellerLoginUrl = typeof window !== 'undefined' ? `${window.location.origin}/vendedor` : '/vendedor'
+
   const copyCredentials = () => {
     if (!createdCredentials) return
-    const text = `Portal DistribOS\nUsuario: ${createdCredentials.email}\nContraseña: ${createdCredentials.password}`
+    const text = `Portal del vendedor de DistribOS
+Enlace: ${sellerLoginUrl}
+Usuario: ${createdCredentials.email}
+Contraseña: ${createdCredentials.password}
+
+Podrás cambiar tu contraseña una vez adentro, desde "Mi perfil".`
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
@@ -90,6 +97,27 @@ export default function SellersPage() {
           </Button>
         }
       />
+
+      <Card className="mb-4">
+        <CardBody className="p-4 flex items-center gap-3 flex-wrap">
+          <div className="flex-1 min-w-[220px]">
+            <div className="text-xs text-text-secondary uppercase tracking-wide mb-1">
+              Enlace para que ingresen los vendedores
+            </div>
+            <div className="text-sm font-mono text-accent break-all">{sellerLoginUrl}</div>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              navigator.clipboard.writeText(sellerLoginUrl)
+              toast.success('Enlace copiado')
+            }}
+          >
+            <Copy size={13} /> Copiar enlace
+          </Button>
+        </CardBody>
+      </Card>
 
       <Card>
         <CardBody className="p-0">
@@ -197,16 +225,18 @@ export default function SellersPage() {
         {createdCredentials && (
           <div className="flex flex-col gap-3">
             <div className="bg-surface-2 border border-border rounded-md p-4 font-mono text-sm">
+              <div className="text-text-secondary">Enlace de acceso</div>
+              <div className="text-accent break-all mb-3">{sellerLoginUrl}</div>
               <div className="text-text-secondary">Usuario</div>
               <div className="text-text-primary mb-3">{createdCredentials.email}</div>
               <div className="text-text-secondary">Contraseña</div>
               <div className="text-text-primary text-lg font-semibold">{createdCredentials.password}</div>
             </div>
             <Button variant="secondary" onClick={copyCredentials}>
-              {copied ? <><Check size={14} /> Copiado</> : <><Copy size={14} /> Copiar credenciales</>}
+              {copied ? <><Check size={14} /> Copiado</> : <><Copy size={14} /> Copiar link + credenciales</>}
             </Button>
             <div className="text-xs text-text-muted">
-              El vendedor puede cambiar su contraseña desde su portal en cualquier momento.
+              Compartí esos datos con el vendedor (email, WhatsApp, etc). Al entrar, puede cambiar su contraseña desde "Mi perfil".
             </div>
           </div>
         )}

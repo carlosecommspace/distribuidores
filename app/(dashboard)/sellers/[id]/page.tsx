@@ -143,9 +143,15 @@ export default function SellerDetailPage() {
     router.push('/sellers')
   }
 
+  const sellerLoginUrl = typeof window !== 'undefined' ? `${window.location.origin}/vendedor` : '/vendedor'
+
   const copyPwd = () => {
     if (!pwd || !data) return
-    navigator.clipboard.writeText(`Usuario: ${data.seller.user.email}\nContraseña: ${pwd}`)
+    const text = `Portal del vendedor de DistribOS
+Enlace: ${sellerLoginUrl}
+Usuario: ${data.seller.user.email}
+Contraseña: ${pwd}`
+    navigator.clipboard.writeText(text)
     setPwdCopied(true)
     setTimeout(() => setPwdCopied(false), 2000)
   }
@@ -334,13 +340,15 @@ export default function SellerDetailPage() {
         {pwd && (
           <div className="flex flex-col gap-3">
             <div className="bg-surface-2 border border-border rounded-md p-4 font-mono text-sm">
+              <div className="text-text-secondary">Enlace de acceso</div>
+              <div className="text-accent break-all mb-3">{sellerLoginUrl}</div>
               <div className="text-text-secondary">Usuario</div>
               <div className="text-text-primary mb-3">{data.seller.user.email}</div>
               <div className="text-text-secondary">Nueva contraseña</div>
               <div className="text-text-primary text-lg font-semibold">{pwd}</div>
             </div>
             <Button variant="secondary" onClick={copyPwd}>
-              {pwdCopied ? <><Check size={14} /> Copiado</> : <><Copy size={14} /> Copiar credenciales</>}
+              {pwdCopied ? <><Check size={14} /> Copiado</> : <><Copy size={14} /> Copiar link + credenciales</>}
             </Button>
           </div>
         )}
