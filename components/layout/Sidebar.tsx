@@ -16,6 +16,7 @@ import {
   Settings,
   Globe,
   Mail,
+  BadgeCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -24,6 +25,7 @@ const nav = [
   { href: '/inventory', label: 'Inventario', icon: Package },
   { href: '/categories', label: 'Categorías', icon: FolderTree },
   { href: '/clients', label: 'Clientes', icon: Users },
+  { href: '/sellers', label: 'Vendedores', icon: BadgeCheck },
   { href: '/price-lists', label: 'Listas de precio', icon: Tag },
   { href: '/requests', label: 'Pedidos', icon: Inbox },
   { href: '/sales', label: 'Ventas', icon: ShoppingCart },

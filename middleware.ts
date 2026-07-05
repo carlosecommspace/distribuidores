@@ -66,10 +66,11 @@ export default auth((req) => {
   }
 
   if (isAuth && pathname === '/login') {
-    const dest = role === 'client' ? '/portal' : '/'
+    const dest = role === 'client' ? '/portal' : role === 'seller' ? '/seller' : '/'
     return NextResponse.redirect(new URL(dest, req.nextUrl.origin))
   }
 
+  // Client (portal): solo /portal + endpoints necesarios
   if (isAuth && role === 'client') {
     const allowed =
       pathname.startsWith('/portal') ||
@@ -82,7 +83,24 @@ export default auth((req) => {
     }
   }
 
+  // Seller (portal del vendedor): solo /seller + endpoints necesarios
+  if (isAuth && role === 'seller') {
+    const allowed =
+      pathname.startsWith('/seller') ||
+      pathname.startsWith('/api/seller') ||
+      pathname.startsWith('/api/auth') ||
+      pathname.startsWith('/api/uploads') ||
+      pathname.startsWith('/api/products/search') // reutilizable en el picker de productos
+    if (!allowed && !isPublic) {
+      return NextResponse.redirect(new URL('/seller', req.nextUrl.origin))
+    }
+  }
+
+  // Admin: bloqueado el portal de cliente y de seller (evita colisiones)
   if (isAuth && role !== 'client' && (pathname.startsWith('/portal') || pathname.startsWith('/print/portal'))) {
+    return NextResponse.redirect(new URL('/', req.nextUrl.origin))
+  }
+  if (isAuth && role !== 'seller' && pathname.startsWith('/seller')) {
     return NextResponse.redirect(new URL('/', req.nextUrl.origin))
   }
 

@@ -18,9 +18,14 @@ model User {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  role         String        @default("admin")
+  role         String        @default("admin") // admin | client | seller
   clientId     String?       @unique
   clientLink   Client?       @relation("ClientPortalUser", fields: [clientId], references: [id], onDelete: SetNull)
+
+  // Cuando el usuario es un vendedor (role=seller), este es su perfil
+  sellerProfile Seller?      @relation("SellerUser")
+  // Cuando el usuario es el admin/merchant, estos son los vendedores que creo
+  sellersOwned  Seller[]     @relation("SellerOwner")
 
   products      Product[]
   categories    Category[]
@@ -36,6 +41,48 @@ model User {
   settings      Settings?
   merchantSite  MerchantSite?
   websiteLeads  WebsiteLead[]
+}
+
+// -----------------------------------------------------------------------------
+// Seller — perfil de vendedor de un merchant. Tiene un User asociado con
+// role=seller (usa el login normal). El merchant lo crea/suspende. Los clientes
+// se le asignan via SellerClient. Los pedidos que coloca guardan sellerId.
+// -----------------------------------------------------------------------------
+
+model Seller {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation("SellerUser", fields: [userId], references: [id], onDelete: Cascade)
+  ownerId     String
+  owner       User     @relation("SellerOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name        String
+  phone       String?
+  notes       String?
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clientAssignments SellerClient[]
+  requests    ProductRequest[] @relation("SellerRequests")
+  sales       Sale[]           @relation("SellerSales")
+  clientsCreated Client[]      @relation("ClientCreatedBySeller")
+
+  @@index([ownerId, isActive])
+}
+
+model SellerClient {
+  id        String   @id @default(cuid())
+  sellerId  String
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  clientId  String
+  client    Client   @relation("SellerClientAssignment", fields: [clientId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([sellerId, clientId])
+  @@index([clientId])
 }
 
 model FileUpload {
@@ -229,9 +276,15 @@ model Client {
   priceListId    String?
   priceList      PriceList? @relation(fields: [priceListId], references: [id], onDelete: SetNull)
 
+  // Si el cliente fue creado por un vendedor, se guarda quien lo creo.
+  // El vendedor queda automaticamente asignado al cliente que crea.
+  createdBySellerId String?
+  createdBySeller   Seller? @relation("ClientCreatedBySeller", fields: [createdBySellerId], references: [id], onDelete: SetNull)
+
   portalUser     User?     @relation("ClientPortalUser")
   requests       ProductRequest[]
   waContacts     WhatsAppContact[]
+  sellerAssignments SellerClient[] @relation("SellerClientAssignment")
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -239,6 +292,7 @@ model Client {
   sales          Sale[]
 
   @@index([userId])
+  @@index([createdBySellerId])
 }
 
 model PriceList {
@@ -282,6 +336,10 @@ model ProductRequest {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   clientId    String
   client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Si el pedido lo coloco un vendedor (en nombre de un cliente asignado)
+  sellerId    String?
+  seller      Seller?  @relation("SellerRequests", fields: [sellerId], references: [id], onDelete: SetNull)
 
   // Código legible tipo DIS-001. Único por tenant.
   code        String?
@@ -360,6 +418,11 @@ model Sale {
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   clientId      String?
   client        Client?    @relation(fields: [clientId], references: [id])
+
+  // Vendedor atribuido a la venta (heredado del ProductRequest al liberarlo,
+  // o seteado directamente si la venta se registra desde el portal del vendedor)
+  sellerId      String?
+  seller        Seller?    @relation("SellerSales", fields: [sellerId], references: [id], onDelete: SetNull)
 
   channel       String
   mlOrderId     String?
