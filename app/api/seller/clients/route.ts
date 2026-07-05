@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   if (d.priceListId) {
     const pl = await prisma.priceList.findUnique({ where: { id: d.priceListId }, select: { userId: true } })
     if (!pl || pl.userId !== ctx.ownerId) {
-      return NextResponse.json({ error: 'Lista de precio inválida' }, { status: 400 })
+      return NextResponse.json({ error: 'Lista de precios inválida' }, { status: 400 })
     }
   }
 

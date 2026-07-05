@@ -113,7 +113,7 @@ export function ClientPortalSection({ clientId, initialPriceListId, portalUser }
         <CardBody className="flex flex-col gap-4">
           <div>
             <div className="text-xs uppercase tracking-wider text-text-secondary mb-2 flex items-center gap-1.5">
-              <Tag size={12} /> Lista de precio
+              <Tag size={12} /> Lista de precios
             </div>
             <Select
               value={priceListId}

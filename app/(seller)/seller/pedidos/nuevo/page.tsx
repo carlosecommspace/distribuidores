@@ -64,7 +64,7 @@ export default function NewOrderPage() {
     setLoadingProducts(true)
     const url = new URL('/api/products/search', window.location.origin)
     url.searchParams.set('q', productQuery)
-    url.searchParams.set('clientId', clientId) // aplica lista de precio del cliente
+    url.searchParams.set('clientId', clientId) // aplica lista de precios del cliente
     fetch(url.toString())
       .then((r) => r.json())
       .then((d) => {

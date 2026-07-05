@@ -220,7 +220,7 @@ Contraseña: ${pwd}`
                 <TR>
                   <TH>Cliente</TH>
                   <TH>Contacto</TH>
-                  <TH>Lista de precio</TH>
+                  <TH>Lista de precios</TH>
                   <TH className="text-right">Total compras</TH>
                   <TH></TH>
                 </TR>

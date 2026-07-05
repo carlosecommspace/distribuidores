@@ -26,7 +26,7 @@ const nav = [
   { href: '/categories', label: 'Categorías', icon: FolderTree },
   { href: '/clients', label: 'Clientes', icon: Users },
   { href: '/sellers', label: 'Vendedores', icon: BadgeCheck },
-  { href: '/price-lists', label: 'Listas de precio', icon: Tag },
+  { href: '/price-lists', label: 'Listas de precios', icon: Tag },
   { href: '/requests', label: 'Pedidos', icon: Inbox },
   { href: '/sales', label: 'Ventas', icon: ShoppingCart },
   { href: '/mercadolibre', label: 'MercadoLibre', icon: Store },

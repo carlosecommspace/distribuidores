@@ -223,7 +223,7 @@ export default function PriceListDetailPage() {
   return (
     <div>
       <Link href="/price-lists" className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-accent mb-4">
-        <ArrowLeft size={14} /> Listas de precio
+        <ArrowLeft size={14} /> Listas de precios
       </Link>
       <PageHeader
         title={list.name}
@@ -506,7 +506,7 @@ export default function PriceListDetailPage() {
       <Modal
         open={editOpen}
         onOpenChange={setEditOpen}
-        title="Editar lista de precio"
+        title="Editar lista de precios"
         size="md"
         footer={
           <>
