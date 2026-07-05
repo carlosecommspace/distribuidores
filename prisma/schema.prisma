@@ -18,7 +18,8 @@ model User {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  role         String        @default("admin") // admin | client | seller
+  role         String        @default("admin") // admin (merchant) | client (portal) | seller | superadmin (global)
+  isActive     Boolean       @default(true)  // Gate global de login. superadmin lo togglea por merchant.
   clientId     String?       @unique
   clientLink   Client?       @relation("ClientPortalUser", fields: [clientId], references: [id], onDelete: SetNull)
 
