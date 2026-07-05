@@ -319,6 +319,7 @@ async function handleIncomingMessage(
     where: { userId_phoneNumber: { userId, phoneNumber: phone } },
     update: {
       name: displayName || undefined,
+      jid, // preserva el JID canonico (importante para LIDs)
       lastMessageAt: new Date(),
       lastMessagePreview: content.slice(0, 100),
       lastDirection: 'in',
@@ -328,6 +329,7 @@ async function handleIncomingMessage(
     create: {
       userId,
       phoneNumber: phone,
+      jid,
       name: displayName,
       lastMessageAt: new Date(),
       lastMessagePreview: content.slice(0, 100),
@@ -465,28 +467,36 @@ const server = createServer(async (req, res) => {
         return send(res, 400, { error: 'session not connected', status: sess?.status })
       }
 
-      // Normaliza el número: quita cualquier caracter no numérico
-      const rawNumber = to.includes('@') ? to.split('@')[0] : to
-      const phoneOnly = rawNumber.replace(/[^0-9]/g, '')
-      if (!phoneOnly) return send(res, 400, { error: 'invalid phone number' })
+      // `to` puede ser:
+      //   1. Un JID completo (ya con @s.whatsapp.net o @lid)  -> usar tal cual
+      //   2. Un número puro -> normalizar y validar con onWhatsApp()
+      let jid: string
+      const isLid = to.endsWith('@lid')
+      const isFullJid = to.includes('@')
 
-      // Verifica que el número esté en WhatsApp y obtén el JID canónico
-      let jid = `${phoneOnly}@s.whatsapp.net`
-      try {
-        const check = await sess.sock.onWhatsApp(phoneOnly)
-        if (Array.isArray(check) && check.length > 0 && check[0].exists) {
-          jid = String(check[0].jid) || jid
-        } else {
-          log.warn({ userId, phone: phoneOnly }, 'number not on WhatsApp')
-          return send(res, 400, { error: 'El número no está en WhatsApp' })
+      if (isFullJid) {
+        jid = to
+      } else {
+        const phoneOnly = to.replace(/[^0-9]/g, '')
+        if (!phoneOnly) return send(res, 400, { error: 'invalid phone number' })
+        jid = `${phoneOnly}@s.whatsapp.net`
+        // Solo validamos con onWhatsApp cuando es un número real (no LID)
+        try {
+          const check = await sess.sock.onWhatsApp(phoneOnly)
+          if (Array.isArray(check) && check.length > 0 && check[0].exists) {
+            jid = String(check[0].jid) || jid
+          } else {
+            log.warn({ userId, phone: phoneOnly }, 'number not on WhatsApp')
+            return send(res, 400, { error: 'El número no está en WhatsApp' })
+          }
+        } catch (err) {
+          log.warn({ err }, 'onWhatsApp check failed, sending anyway')
         }
-      } catch (err) {
-        log.warn({ err }, 'onWhatsApp check failed, sending anyway')
       }
 
       try {
         const sent = await sess.sock.sendMessage(jid, { text: content })
-        log.info({ userId, jid, msgId: sent?.key?.id, msgStatus: sent?.status }, 'message sent')
+        log.info({ userId, jid, isLid, msgId: sent?.key?.id, msgStatus: sent?.status }, 'message sent')
         return send(res, 200, { ok: true, externalId: sent?.key?.id || null, jid })
       } catch (err) {
         log.error({ err, userId, jid }, 'sendMessage failed')
