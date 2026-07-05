@@ -45,6 +45,7 @@ export default function InboxPage() {
   const [contacts, setContacts] = useState<ContactPreview[]>([])
   const [selected, setSelected] = useState<ContactDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [globalAi, setGlobalAi] = useState<boolean>(false)
   const [q, setQ] = useState('')
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -72,9 +73,28 @@ export default function InboxPage() {
 
   useEffect(() => {
     loadContacts()
+    // Cargar toggle global de IA
+    fetch('/api/settings').then((r) => r.json()).then((d) => {
+      setGlobalAi(!!d?.settings?.waAiEnabled)
+    }).catch(() => {})
     const t = setInterval(loadContacts, 8000)
     return () => clearInterval(t)
   }, [])
+
+  const toggleGlobalAi = async (v: boolean) => {
+    setGlobalAi(v)
+    const r = await fetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ settings: { waAiEnabled: v } }),
+    })
+    if (!r.ok) {
+      toast.error('No se pudo guardar el ajuste')
+      setGlobalAi(!v)
+      return
+    }
+    toast.success(v ? 'IA activada para TODOS los chats' : 'IA global desactivada')
+  }
 
   useEffect(() => {
     if (initialContactId) loadContact(initialContactId)
@@ -137,7 +157,25 @@ export default function InboxPage() {
       <Link href="/whatsapp" className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-accent mb-3">
         <ArrowLeft size={14} /> WhatsApp
       </Link>
-      <h1 className="font-display text-xl md:text-2xl font-bold text-text-primary mb-4">Bandeja de entrada</h1>
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <h1 className="font-display text-xl md:text-2xl font-bold text-text-primary">Bandeja de entrada</h1>
+        <div className="flex items-center gap-2 bg-surface border border-border rounded-md px-3 py-1.5">
+          <Bot size={14} className={globalAi ? 'text-accent' : 'text-text-muted'} />
+          <Switch checked={globalAi} onCheckedChange={toggleGlobalAi} label="IA global" />
+        </div>
+      </div>
+
+      {globalAi && (
+        <div className="bg-accent-subtle border border-accent-border rounded-md p-3 mb-4 text-sm flex items-start gap-2">
+          <Bot size={16} className="text-accent flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="text-accent font-medium">Modo IA global activo</div>
+            <div className="text-xs text-text-secondary mt-0.5">
+              La IA responde automáticamente a todos los mensajes entrantes. Puedes desactivarla arriba para volver al control por conversación.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[300px,1fr] gap-3 md:gap-4 min-h-[600px]">
         <Card className="overflow-hidden flex flex-col">

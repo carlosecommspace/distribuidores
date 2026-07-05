@@ -276,8 +276,8 @@ export default function SettingsPage() {
             <Switch
               checked={settings.waAiEnabled}
               onCheckedChange={(v) => setSettings({ ...settings, waAiEnabled: v })}
-              label="Chatbot IA disponible"
-              hint="Cuando está activo, cada conversación tiene un toggle para dejar que la IA responda"
+              label="IA responde automáticamente a TODOS los chats"
+              hint="Cuando está activo, la IA contesta cada mensaje entrante sin que tengas que activarlo por conversación. Puedes seguir activando la IA en chats individuales cuando esto esté OFF."
             />
 
             {settings.waAiEnabled && (
