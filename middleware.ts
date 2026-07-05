@@ -90,37 +90,43 @@ export default auth((req) => {
     return NextResponse.redirect(new URL(dest, req.nextUrl.origin))
   }
 
+  // Helper: matchea /prefix exacto o /prefix/... — evita que /sellers matchee
+  // con /seller (bug historico donde el admin no podia entrar a /sellers).
+  const startsWithExact = (p: string, prefix: string) => p === prefix || p.startsWith(`${prefix}/`)
+
   // Client (portal): solo /portal + endpoints necesarios
   if (isAuth && role === 'client') {
     const allowed =
-      pathname.startsWith('/portal') ||
-      pathname.startsWith('/api/portal') ||
-      pathname.startsWith('/api/auth') ||
-      pathname.startsWith('/api/uploads') ||
-      pathname.startsWith('/print/portal')
+      startsWithExact(pathname, '/portal') ||
+      startsWithExact(pathname, '/api/portal') ||
+      startsWithExact(pathname, '/api/auth') ||
+      startsWithExact(pathname, '/api/uploads') ||
+      startsWithExact(pathname, '/print/portal')
     if (!allowed && !isPublic) {
       return NextResponse.redirect(new URL('/portal', req.nextUrl.origin))
     }
   }
 
-  // Seller (portal del vendedor): solo /seller + endpoints necesarios
+  // Seller (portal del vendedor): solo /seller (singular) + endpoints necesarios.
+  // Ojo: /seller NO matchea /sellers (esa es la pagina del admin merchant).
   if (isAuth && role === 'seller') {
     const allowed =
-      pathname.startsWith('/seller') ||
-      pathname.startsWith('/api/seller') ||
-      pathname.startsWith('/api/auth') ||
-      pathname.startsWith('/api/uploads') ||
-      pathname.startsWith('/api/products/search') // reutilizable en el picker de productos
+      startsWithExact(pathname, '/seller') ||
+      startsWithExact(pathname, '/api/seller') ||
+      startsWithExact(pathname, '/api/auth') ||
+      startsWithExact(pathname, '/api/uploads') ||
+      startsWithExact(pathname, '/api/products/search')
     if (!allowed && !isPublic) {
       return NextResponse.redirect(new URL('/seller', req.nextUrl.origin))
     }
   }
 
-  // Admin: bloqueado el portal de cliente y de seller (evita colisiones)
-  if (isAuth && role !== 'client' && (pathname.startsWith('/portal') || pathname.startsWith('/print/portal'))) {
+  // Admin: bloqueado el portal de cliente y el portal del vendedor
+  if (isAuth && role !== 'client' && (startsWithExact(pathname, '/portal') || startsWithExact(pathname, '/print/portal'))) {
     return NextResponse.redirect(new URL('/', req.nextUrl.origin))
   }
-  if (isAuth && role !== 'seller' && pathname.startsWith('/seller')) {
+  // /seller EXACTO o /seller/... — NO matchea /sellers (admin merchant CRUD)
+  if (isAuth && role !== 'seller' && startsWithExact(pathname, '/seller')) {
     return NextResponse.redirect(new URL('/', req.nextUrl.origin))
   }
 
