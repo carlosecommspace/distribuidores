@@ -26,6 +26,7 @@ import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
   Browsers,
+  fetchLatestBaileysVersion,
   proto,
   type WASocket,
   type AuthenticationState,
@@ -136,6 +137,29 @@ async function loadAuthState(userId: string): Promise<{
 // Conexión Baileys
 // ---------------------------------------------------------------------------
 
+// Cache de la versión más reciente de WhatsApp conocida por Baileys.
+// Se refresca cada 6 horas para no golpear el endpoint público en cada conexión.
+let cachedVersion: [number, number, number] | null = null
+let cachedVersionAt = 0
+const VERSION_CACHE_MS = 6 * 60 * 60 * 1000
+
+async function getWAVersion(): Promise<[number, number, number]> {
+  const now = Date.now()
+  if (cachedVersion && now - cachedVersionAt < VERSION_CACHE_MS) return cachedVersion
+  try {
+    const { version, isLatest } = await fetchLatestBaileysVersion()
+    log.info({ version, isLatest }, 'fetched WhatsApp version')
+    cachedVersion = version
+    cachedVersionAt = now
+    return version
+  } catch (e) {
+    log.warn({ err: e }, 'fetchLatestBaileysVersion failed, using bundled default')
+    // Fallback si el endpoint público está caído — usa una versión razonable reciente
+    const fallback: [number, number, number] = cachedVersion || [2, 3000, 1015901307]
+    return fallback
+  }
+}
+
 async function connectSession(userId: string): Promise<void> {
   const existing = sessions.get(userId)
   if (existing?.sock && existing.status !== 'disconnected') {
@@ -143,14 +167,17 @@ async function connectSession(userId: string): Promise<void> {
     return
   }
 
+  const version = await getWAVersion()
   const { state, saveCreds } = await loadAuthState(userId)
   const sock = makeWASocket({
+    version,
     auth: state,
     printQRInTerminal: false,
     logger: log.child({ userId }) as never,
-    browser: Browsers.macOS('DistribOS'),
+    browser: Browsers.ubuntu('Chrome'), // identifier estandar; menos probable de ser flagged
     syncFullHistory: false,
     markOnlineOnConnect: false,
+    generateHighQualityLinkPreview: false,
   })
 
   const sess: Session = { userId, sock, status: 'connecting', lastQr: null }
