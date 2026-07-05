@@ -37,7 +37,10 @@ export async function POST(req: Request) {
     },
   })
 
-  const result = await waClient.send(userId, contact.phoneNumber, parsed.data.content)
+  // Preferir el JID canonico guardado (contiene el dominio correcto, ej @lid vs @s.whatsapp.net).
+  // Fallback al phoneNumber para contactos viejos que no tengan jid persistido.
+  const target = contact.jid || contact.phoneNumber
+  const result = await waClient.send(userId, target, parsed.data.content)
 
   if (result) {
     await prisma.whatsAppMessage.update({

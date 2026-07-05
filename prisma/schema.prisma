@@ -495,7 +495,8 @@ model WhatsAppContact {
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  phoneNumber   String    // E.164 sin +, ej "584121234567"
+  phoneNumber   String    // E.164 sin +, ej "584121234567" (o el LID si es un contacto anonimo)
+  jid           String?   // JID completo de WhatsApp, ej "584121234567@s.whatsapp.net" o "12345@lid"
   name          String?   // display name enviado por WA
   clientId      String?
   client        Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
