@@ -381,6 +381,7 @@ model Sale {
   items         SaleItem[]
   releasedFrom  ProductRequest? @relation("RequestRelease")
 
+  @@unique([userId, mlOrderId])
   @@index([userId])
   @@index([createdAt])
 }
