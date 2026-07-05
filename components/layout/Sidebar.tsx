@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { SignOutButton } from '@/components/auth/SignOutButton'
 import {
   LayoutDashboard,
   Package,
@@ -13,7 +14,6 @@ import {
   MessageCircle,
   BarChart3,
   Settings,
-  LogOut,
   Globe,
   Mail,
 } from 'lucide-react'
@@ -82,11 +82,7 @@ export function Sidebar({ user, onNavigate }: Props) {
             <div className="text-sm text-text-primary truncate">{user.name || user.email}</div>
             <div className="text-[11px] text-text-muted truncate">{user.email}</div>
           </div>
-          <form action="/api/auth/signout" method="post">
-            <button type="submit" className="text-text-muted hover:text-danger p-1" title="Cerrar sesión">
-              <LogOut size={14} />
-            </button>
-          </form>
+          <SignOutButton />
         </div>
       </div>
     </aside>

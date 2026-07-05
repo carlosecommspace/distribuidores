@@ -2,9 +2,10 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import { LogOut, ShoppingBag, Home, History, User } from 'lucide-react'
+import { ShoppingBag, Home, History, User } from 'lucide-react'
 import { ToastViewport } from '@/components/ui/Toast'
 import { PortalNavLink } from '@/components/portal/PortalNavLink'
+import { SignOutButton } from '@/components/auth/SignOutButton'
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -36,11 +37,7 @@ export default async function PortalLayout({ children }: { children: React.React
             <div className="hidden sm:block text-right">
               <div className="text-sm text-text-primary truncate max-w-[180px]">{client.company || client.name}</div>
             </div>
-            <form action="/api/auth/signout" method="post">
-              <button type="submit" className="text-text-muted hover:text-danger p-1.5 rounded-md hover:bg-surface-2" title="Cerrar sesión">
-                <LogOut size={16} />
-              </button>
-            </form>
+            <SignOutButton size={16} className="p-1.5 rounded-md hover:bg-surface-2" />
           </div>
         </div>
       </header>
