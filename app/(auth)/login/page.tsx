@@ -1,13 +1,11 @@
 'use client'
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { signIn, getSession } from 'next-auth/react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { toast } from '@/components/ui/Toast'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -16,13 +14,22 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     const res = await signIn('credentials', { email, password, redirect: false })
-    setLoading(false)
     if (res?.error) {
-      toast.error('Email o contraseña incorrectos')
+      setLoading(false)
+      toast.error('Credenciales inválidas o cuenta suspendida')
       return
     }
-    router.replace('/')
-    router.refresh()
+    // Rutear por rol. Usamos getSession para leer el rol del JWT recien emitido
+    // y despues hard-navigation al destino, mas confiable que router.replace
+    // cuando cambia el rol (evita conflictos con caches del RSC).
+    try {
+      const session = await getSession()
+      const role = (session?.user as { role?: string })?.role
+      const dest = role === 'client' ? '/portal' : role === 'seller' ? '/seller' : role === 'superadmin' ? '/' : '/'
+      window.location.href = dest
+    } catch {
+      window.location.href = '/'
+    }
   }
 
   return (
