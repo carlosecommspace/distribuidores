@@ -193,14 +193,21 @@ async function connectSession(userId: string): Promise<void> {
     if (connection === 'close') {
       const status = (lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode
       const shouldReconnect = status !== DisconnectReason.loggedOut
+
+      // Si estamos esperando escaneo del QR, NO sobreescribimos el status ni el qrCode.
+      // El QR sigue siendo válido por unos segundos y el frontend lo tiene que poder mostrar.
+      const wasWaitingQr = sess.status === 'qr_pending'
+
       sess.status = 'disconnected'
       await prisma.whatsAppSession.update({
         where: { userId },
         data: {
-          status: shouldReconnect ? 'connecting' : 'disconnected',
+          // Mantén 'qr_pending' si estábamos esperando el escaneo — al reconectar en 3s
+          // Baileys puede reutilizar la sesión o generar un QR nuevo.
+          status: wasWaitingQr ? 'qr_pending' : (shouldReconnect ? 'connecting' : 'disconnected'),
           disconnectedAt: new Date(),
           lastError: String(lastDisconnect?.error || 'unknown'),
-          ...(shouldReconnect ? {} : { authState: null }),
+          ...(shouldReconnect ? {} : { authState: null, qrCode: null }),
         },
       }).catch(() => {})
       sessions.delete(userId)

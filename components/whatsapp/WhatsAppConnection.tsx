@@ -115,7 +115,7 @@ export function WhatsAppConnection() {
               </Button>
             </div>
           </>
-        ) : data.status === 'qr_pending' && data.qrCode ? (
+        ) : data.qrCode ? (
           <>
             <Badge tone="warning" dot>Esperando escaneo</Badge>
             <div className="flex flex-col items-center gap-3 py-2">
@@ -135,6 +135,12 @@ export function WhatsAppConnection() {
             <p className="text-xs text-text-muted">
               Generando código QR. Espera unos segundos y verás la imagen aparecer aquí.
             </p>
+            {data.lastError && (
+              <div className="text-xs text-danger">Último error: {data.lastError}</div>
+            )}
+            <Button variant="ghost" loading={disconnecting} onClick={disconnect} size="sm">
+              <LogOut size={14} /> Reiniciar sesión
+            </Button>
           </>
         ) : (
           <>
