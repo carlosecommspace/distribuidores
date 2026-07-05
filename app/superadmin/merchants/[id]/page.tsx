@@ -1,10 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardHeader, CardTitle, CardBody } from '@/components/ui/Card'
 import { Stat } from '@/components/ui/Stat'
-import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Badge } from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -32,21 +32,14 @@ interface Merchant {
   merchantSite: { slug: string; isPublished: boolean; businessName: string } | null
 }
 
-interface Props {
-  merchantId: string
-  basePath: string
-}
-
-export function MerchantDetail({ merchantId, basePath }: Props) {
-  const params = { id: merchantId }
-  const externalBase = basePath
-
+export default function SuperadminMerchantDetailPage() {
+  const params = useParams<{ id: string }>()
   const [merchant, setMerchant] = useState<Merchant | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
     setLoading(true)
-    const r = await fetch(`/api/system/merchants/${params.id}`)
+    const r = await fetch(`/api/superadmin/merchants/${params.id}`)
     if (r.ok) {
       const d = await r.json()
       setMerchant(d.merchant)
@@ -57,7 +50,7 @@ export function MerchantDetail({ merchantId, basePath }: Props) {
   useEffect(() => { load() }, [params.id])
 
   const toggleActive = async (v: boolean) => {
-    const r = await fetch(`/api/system/merchants/${params.id}`, {
+    const r = await fetch(`/api/superadmin/merchants/${params.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ isActive: v }),
@@ -78,7 +71,7 @@ export function MerchantDetail({ merchantId, basePath }: Props) {
 
   return (
     <div>
-      <Link href={externalBase || '/'} className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-accent mb-3">
+      <Link href="/superadmin" className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-accent mb-3">
         <ArrowLeft size={14} /> Merchants
       </Link>
 
@@ -95,14 +88,12 @@ export function MerchantDetail({ merchantId, basePath }: Props) {
           </div>
         }
         actions={
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2 bg-surface border border-border rounded-md px-3 py-1.5">
-              <Switch
-                checked={merchant.isActive}
-                onCheckedChange={toggleActive}
-                label={merchant.isActive ? 'Habilitado' : 'Suspendido'}
-              />
-            </div>
+          <div className="flex items-center gap-2 bg-surface border border-border rounded-md px-3 py-1.5">
+            <Switch
+              checked={merchant.isActive}
+              onCheckedChange={toggleActive}
+              label={merchant.isActive ? 'Habilitado' : 'Suspendido'}
+            />
           </div>
         }
       />
