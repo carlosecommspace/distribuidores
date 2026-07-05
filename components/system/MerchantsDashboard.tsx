@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
-import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardBody } from '@/components/ui/Card'
@@ -33,12 +32,12 @@ interface Merchant {
   }
 }
 
-export default function MerchantsPage() {
-  const pathname = usePathname()
-  const externalBase = useMemo(() => {
-    const parts = (pathname || '').split('/').filter(Boolean)
-    return parts[0] ? `/${parts[0]}` : ''
-  }, [pathname])
+interface Props {
+  basePath: string
+}
+
+export function MerchantsDashboard({ basePath }: Props) {
+  const externalBase = basePath
 
   const [merchants, setMerchants] = useState<Merchant[]>([])
   const [loading, setLoading] = useState(true)
