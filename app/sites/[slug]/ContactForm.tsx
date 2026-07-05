@@ -39,11 +39,11 @@ export function ContactForm({ slug }: Props) {
 
   if (status === 'sent') {
     return (
-      <div className="ms-form" style={{ padding: '2rem 1.5rem', textAlign: 'center', background: '#fff', border: '1px solid #0001', borderRadius: '0.75rem' }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>✓</div>
-        <div style={{ fontWeight: 600, marginBottom: '0.35rem' }}>¡Recibimos tu mensaje!</div>
-        <p style={{ opacity: 0.7, margin: 0 }}>Nos pondremos en contacto muy pronto.</p>
-        <button type="button" onClick={() => setStatus('idle')} style={{ marginTop: '1rem' }}>Enviar otro</button>
+      <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem', color: 'var(--ms-primary)' }}>✓</div>
+        <div style={{ fontWeight: 600, marginBottom: '0.35rem', fontSize: '1.1rem' }}>¡Recibimos tu mensaje!</div>
+        <p style={{ opacity: 0.7, margin: '0 0 1.5rem', fontSize: '0.95rem' }}>Nos pondremos en contacto muy pronto.</p>
+        <button type="button" onClick={() => setStatus('idle')} className="ms-btn ms-btn-outline">Enviar otro</button>
       </div>
     )
   }
@@ -54,13 +54,15 @@ export function ContactForm({ slug }: Props) {
         <label htmlFor="ms-name">Nombre *</label>
         <input id="ms-name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={120} />
       </div>
-      <div>
-        <label htmlFor="ms-email">Correo</label>
-        <input id="ms-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} />
-      </div>
-      <div>
-        <label htmlFor="ms-phone">Teléfono</label>
-        <input id="ms-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+        <div>
+          <label htmlFor="ms-email">Correo</label>
+          <input id="ms-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} />
+        </div>
+        <div>
+          <label htmlFor="ms-phone">Teléfono</label>
+          <input id="ms-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} />
+        </div>
       </div>
       <div>
         <label htmlFor="ms-message">Mensaje *</label>
