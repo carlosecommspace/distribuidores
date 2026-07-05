@@ -31,18 +31,18 @@ export default auth((req) => {
   // -------------------------------------------------------------------------
   // 0) Portal del superadmin — path oculto controlado por env
   // -------------------------------------------------------------------------
-  // Bloqueamos acceso directo a /_system con 404 (para evitar leaks del path
+  // Bloqueamos acceso directo a /system con 404 (para evitar leaks del path
   // interno si alguien lo descubriera)
-  if (pathname === '/_system' || pathname.startsWith('/_system/')) {
+  if (pathname === '/system' || pathname.startsWith('/system/')) {
     return new NextResponse('Not Found', { status: 404 })
   }
   // Si el path externo matchea el SUPERADMIN_URL_PATH, lo reescribimos a
-  // /_system para que Next.js sirva las paginas internas. Las paginas hacen
+  // /system para que Next.js sirva las paginas internas. Las paginas hacen
   // su propio check de role=superadmin.
   if (superadminPath && (pathname === `/${superadminPath}` || pathname.startsWith(`/${superadminPath}/`))) {
     const rest = pathname.slice(`/${superadminPath}`.length) || '/'
     const url = req.nextUrl.clone()
-    url.pathname = `/_system${rest === '/' ? '' : rest}`
+    url.pathname = `/system${rest === '/' ? '' : rest}`
     return NextResponse.rewrite(url)
   }
 
@@ -130,11 +130,11 @@ export default auth((req) => {
     return NextResponse.redirect(new URL('/', req.nextUrl.origin))
   }
 
-  // Superadmin fuera del portal /_system: mandarlo al portal por defecto
+  // Superadmin fuera del portal /system: mandarlo al portal por defecto
   if (isAuth && role === 'superadmin' && superadminPath) {
     // Si un superadmin entra a rutas del admin merchant (/, /inventory, etc)
     // lo mandamos a su portal para que no se confunda con el rol de merchant
-    const isSuperOwnRoute = pathname.startsWith('/api/_system') || pathname.startsWith('/api/auth')
+    const isSuperOwnRoute = pathname.startsWith('/api/system') || pathname.startsWith('/api/auth')
     if (!isSuperOwnRoute) {
       return NextResponse.redirect(new URL(`/${superadminPath}`, req.nextUrl.origin))
     }
