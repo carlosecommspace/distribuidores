@@ -15,8 +15,13 @@
   scroll-behavior: smooth;
 }
 .ms-root * { box-sizing: border-box; }
-.ms-root a { color: var(--ms-primary); text-decoration: none; }
-.ms-root a:hover { text-decoration: underline; }
+/* Anchors por defecto heredan color del contenedor. Cada componente que usa
+   <a> define su propio color (nav-brand, nav-links, btn, product, footer,
+   etc.) para evitar bugs de specificity con el selector global. Los links
+   inline dentro de prose (p a) si estilizamos abajo. */
+.ms-root a { color: inherit; text-decoration: none; }
+.ms-root p a { color: var(--ms-primary); text-decoration: underline; }
+.ms-root p a:hover { opacity: 0.75; }
 .ms-root button { font-family: inherit; }
 
 .ms-container {
@@ -240,9 +245,13 @@
   gap: 0.75rem;
   flex-wrap: wrap;
 }
+/* Ojo: usamos !important en el color del texto de los botones porque los
+   estilos globales de .ms-root a los sobreescribirian por specificity, y los
+   botones se rendean muchas veces como <a>. Es intencional, no accidental. */
 .ms-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.95rem 1.75rem;
   border-radius: 999px;
@@ -251,31 +260,46 @@
   transition: transform 150ms, box-shadow 150ms, background 150ms, border 150ms;
   border: 1.5px solid transparent;
   cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.2;
 }
+.ms-btn:hover { text-decoration: none; }
 .ms-btn-primary {
   background: var(--ms-primary);
-  color: #fff;
+  color: #fff !important;
 }
 .ms-btn-primary:hover {
-  text-decoration: none;
   transform: translateY(-1px);
   box-shadow: 0 12px 30px color-mix(in srgb, var(--ms-primary) 45%, transparent);
+  color: #fff !important;
 }
 .ms-btn-outline {
   background: transparent;
-  color: var(--ms-accent);
+  color: var(--ms-accent) !important;
   border-color: color-mix(in srgb, var(--ms-accent) 20%, transparent);
 }
 .ms-btn-outline:hover {
-  text-decoration: none;
   border-color: var(--ms-accent);
   background: color-mix(in srgb, var(--ms-accent) 5%, transparent);
+  color: var(--ms-accent) !important;
 }
 .ms-hero-arrow::after {
   content: '→';
   transition: transform 150ms;
+  display: inline-block;
 }
 .ms-hero-arrow:hover::after { transform: translateX(3px); }
+
+/* Botones muy angostos (< 400px) — que ocupen todo el ancho para no verse
+   apretados o cortados. */
+@media (max-width: 400px) {
+  .ms-hero-ctas .ms-btn {
+    flex: 1 1 auto;
+    padding: 0.85rem 1rem;
+    font-size: 0.92rem;
+  }
+}
 
 /* Estadisticas / features bajo el hero */
 .ms-hero-stats {
@@ -648,6 +672,262 @@
   text-align: center;
   font-size: 0.85rem;
   opacity: 0.5;
+}
+
+/* =============================================================================
+   CATALOGO PAGE
+   ========================================================================== */
+
+.ms-cat-header {
+  padding: 6rem 0 2rem;
+}
+.ms-cat-title {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 1rem;
+}
+.ms-cat-lead {
+  font-size: 1.05rem;
+  opacity: 0.72;
+  max-width: 60ch;
+  margin: 0;
+}
+
+.ms-cat-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.ms-cat-search {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 480px;
+}
+.ms-cat-search input {
+  width: 100%;
+  padding: 0.75rem 0.95rem 0.75rem 2.6rem;
+  border-radius: 0.6rem;
+  border: 1.5px solid color-mix(in srgb, var(--ms-accent) 12%, transparent);
+  background: #fff;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--ms-accent);
+  transition: border-color 150ms;
+}
+.ms-cat-search input:focus {
+  outline: none;
+  border-color: var(--ms-primary);
+}
+.ms-cat-search-icon {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  opacity: 0.5;
+  color: var(--ms-accent);
+  pointer-events: none;
+}
+
+.ms-cat-view-toggle {
+  display: inline-flex;
+  background: color-mix(in srgb, var(--ms-accent) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ms-accent) 12%, transparent);
+  border-radius: 999px;
+  padding: 3px;
+  flex-shrink: 0;
+}
+.ms-cat-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ms-accent);
+  opacity: 0.6;
+  cursor: pointer;
+  transition: background 150ms, opacity 150ms, color 150ms;
+}
+.ms-cat-view-toggle button svg { width: 16px; height: 16px; }
+.ms-cat-view-toggle button:hover { opacity: 1; }
+.ms-cat-view-toggle button.is-active {
+  background: #fff;
+  opacity: 1;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ms-accent) 10%, transparent);
+}
+@media (max-width: 480px) {
+  .ms-cat-view-toggle button span { display: none; }
+}
+
+.ms-cat-chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.ms-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in srgb, var(--ms-accent) 15%, transparent);
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ms-accent);
+  cursor: pointer;
+  transition: all 150ms;
+}
+.ms-cat-chip:hover {
+  border-color: color-mix(in srgb, var(--ms-accent) 35%, transparent);
+}
+.ms-cat-chip.is-active {
+  background: var(--ms-accent);
+  color: #fff;
+  border-color: var(--ms-accent);
+}
+.ms-cat-chip-count {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ms-accent) 8%, transparent);
+}
+.ms-cat-chip.is-active .ms-cat-chip-count {
+  background: color-mix(in srgb, #fff 20%, transparent);
+  opacity: 0.85;
+}
+
+.ms-cat-count {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  margin-bottom: 1.25rem;
+}
+
+.ms-cat-empty {
+  text-align: center;
+  padding: 4rem 1rem;
+  border: 1.5px dashed color-mix(in srgb, var(--ms-accent) 15%, transparent);
+  border-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.ms-cat-empty p { margin: 0; opacity: 0.7; }
+
+/* List view */
+.ms-cat-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.ms-cat-list-item {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 1.25rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--ms-accent) 6%, transparent);
+  border-radius: 0.75rem;
+  transition: transform 150ms, box-shadow 150ms, border-color 150ms;
+  color: var(--ms-accent);
+  align-items: center;
+}
+.ms-cat-list-item:hover {
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--ms-accent) 6%, transparent);
+  border-color: color-mix(in srgb, var(--ms-primary) 30%, transparent);
+}
+.ms-cat-list-img {
+  width: 120px;
+  height: 120px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ms-neutral) 60%, var(--ms-accent) 6%);
+  flex-shrink: 0;
+}
+.ms-cat-list-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ms-cat-list-img-empty {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0.15; font-size: 2rem;
+}
+.ms-cat-list-body { min-width: 0; }
+.ms-cat-list-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0.25rem 0 0.35rem;
+  color: var(--ms-accent);
+}
+.ms-cat-list-desc {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin: 0 0 0.4rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ms-cat-list-meta {
+  font-size: 0.8rem;
+  opacity: 0.55;
+}
+.ms-cat-list-price {
+  text-align: right;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+.ms-cat-list-cta {
+  font-size: 0.8rem;
+  color: var(--ms-primary);
+  font-weight: 500;
+}
+@media (max-width: 640px) {
+  .ms-cat-list-item {
+    grid-template-columns: 90px 1fr;
+    gap: 0.9rem;
+    padding: 0.85rem;
+  }
+  .ms-cat-list-img { width: 90px; height: 90px; }
+  .ms-cat-list-price {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.5rem;
+    border-top: 1px solid color-mix(in srgb, var(--ms-accent) 6%, transparent);
+    text-align: left;
+  }
+  .ms-cat-list-desc { -webkit-line-clamp: 3; line-clamp: 3; }
+}
+
+/* CTA "Ver catalogo completo" en el section preview */
+.ms-catalog-preview-cta {
+  display: flex;
+  justify-content: center;
+  margin-top: 3rem;
 }
 
 /* =============================================================================

@@ -39,3 +39,17 @@ export function siteUrl(slug: string): string {
   }
   return `https://${slug}.${root}`
 }
+
+/**
+ * Devuelve el prefijo de path para links internos del sitio del merchant.
+ * En subdominio ("mitienda.distribos.com") no necesitamos prefijo → devuelve "".
+ * En path-based ("app.com/sites/mitienda") devuelve "/sites/{slug}".
+ * Se usa como: <a href={`${siteBasePath(slug, host)}/catalogo`}>
+ */
+export function siteBasePath(slug: string, host: string | null | undefined): string {
+  const root = process.env.APP_ROOT_DOMAIN
+  if (!root || !host) return `/sites/${slug}`
+  const h = host.split(':')[0].toLowerCase()
+  if (h === `${slug}.${root.toLowerCase()}`) return ''
+  return `/sites/${slug}`
+}

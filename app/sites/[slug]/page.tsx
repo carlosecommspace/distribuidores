@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
+import { siteBasePath } from '@/lib/merchant-site'
 import { ContactForm } from './ContactForm'
 import { Nav } from './Nav'
 
@@ -34,10 +36,17 @@ export default async function SitePage({ params }: Props) {
   const hasGallery = galleryImages.length > 0
   const hasCatalog = products.length > 0
 
+  // En el home mostramos solo un preview de 12; el catalogo completo va en /catalogo
+  const previewProducts = products.slice(0, 12)
+  const hasMoreCatalog = products.length > previewProducts.length
+
+  const host = headers().get('host')
+  const base = siteBasePath(params.slug, host)
+
   const links: { href: string; label: string }[] = []
   if (hasAbout) links.push({ href: '#nosotros', label: 'Nosotros' })
   if (hasGallery) links.push({ href: '#trabajo', label: 'Trabajo' })
-  if (hasCatalog) links.push({ href: '#catalogo', label: 'Catálogo' })
+  if (hasCatalog) links.push({ href: `${base}/catalogo`, label: 'Catálogo' })
 
   return (
     <div id="top">
@@ -53,7 +62,7 @@ export default async function SitePage({ params }: Props) {
             <div className="ms-hero-ctas">
               <a href="#contacto" className="ms-btn ms-btn-primary">Contactar ahora</a>
               {hasCatalog && (
-                <a href="#catalogo" className="ms-btn ms-btn-outline ms-hero-arrow">Ver catálogo</a>
+                <a href={`${base}/catalogo`} className="ms-btn ms-btn-outline ms-hero-arrow">Ver catálogo</a>
               )}
             </div>
 
@@ -130,20 +139,18 @@ export default async function SitePage({ params }: Props) {
         </section>
       )}
 
-      {/* Catálogo */}
+      {/* Catálogo (preview) */}
       {hasCatalog && (
         <section id="catalogo" className="ms-section">
           <div className="ms-container">
             <span className="ms-section-eyebrow">Productos</span>
             <h2 className="ms-section-title">Nuestro catálogo</h2>
             <p className="ms-section-subtitle">
-              {products.length === 60
-                ? 'Una selección de lo que tenemos disponible ahora. Escríbenos si buscas algo específico.'
-                : 'Estos son los productos que tenemos disponibles ahora mismo.'}
+              Estos son algunos de los productos que tenemos disponibles ahora mismo.
             </p>
             <div className="ms-catalog">
-              {products.map((p) => (
-                <a key={p.id} href="#contacto" className="ms-product">
+              {previewProducts.map((p) => (
+                <a key={p.id} href={`${base}/catalogo`} className="ms-product">
                   <div className="ms-product-img-wrap">
                     {p.images[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -160,6 +167,19 @@ export default async function SitePage({ params }: Props) {
                 </a>
               ))}
             </div>
+            {hasMoreCatalog ? (
+              <div className="ms-catalog-preview-cta">
+                <a href={`${base}/catalogo`} className="ms-btn ms-btn-primary ms-hero-arrow">
+                  Ver todos los productos ({products.length})
+                </a>
+              </div>
+            ) : (
+              <div className="ms-catalog-preview-cta">
+                <a href={`${base}/catalogo`} className="ms-btn ms-btn-outline ms-hero-arrow">
+                  Explorar el catálogo con búsqueda y filtros
+                </a>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -229,7 +249,7 @@ export default async function SitePage({ params }: Props) {
             <div className="ms-footer-links">
               <a href="#top">Inicio</a>
               {hasAbout && <a href="#nosotros">Nosotros</a>}
-              {hasCatalog && <a href="#catalogo">Catálogo</a>}
+              {hasCatalog && <a href={`${base}/catalogo`}>Catálogo</a>}
               <a href="#contacto">Contacto</a>
             </div>
           </div>
