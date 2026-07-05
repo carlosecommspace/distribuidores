@@ -23,6 +23,9 @@ type SettingsPatch = Partial<{
   primaryCurrency: 'USD' | 'EUR'
   defaultMargin: number
   waPhoneNumber: string
+  waRetentionDays: number
+  waAiEnabled: boolean
+  waAiPrompt: string
   mlAutoAnswer: boolean
   mlAutoSync: boolean
   mlSyncInterval: number

@@ -67,11 +67,34 @@ async function runOnce() {
   console.log('[cron] price-sync done · USD', usdRate.rate, '· EUR', eurRate.rate)
 }
 
+/**
+ * Purga mensajes WhatsApp fuera de la ventana de retención de cada tenant.
+ * settings.waRetentionDays === 0 → modo privado, borra TODOS al día siguiente.
+ * settings.waRetentionDays === -1 o null → sin límite.
+ */
+async function purgeWhatsAppMessages() {
+  const tenants = await prisma.settings.findMany({
+    where: { waRetentionDays: { gt: 0 } },
+    select: { userId: true, waRetentionDays: true },
+  })
+  for (const t of tenants) {
+    const cutoff = new Date(Date.now() - t.waRetentionDays * 24 * 60 * 60 * 1000)
+    const r = await prisma.whatsAppMessage.deleteMany({
+      where: { userId: t.userId, createdAt: { lt: cutoff } },
+    }).catch((e) => { console.error('[cron] purge wa msgs failed', t.userId, e); return { count: 0 } })
+    if (r.count > 0) console.log('[cron] purged', r.count, 'wa messages for', t.userId)
+  }
+}
+
 if (process.env.CRON_RUN_ONCE) {
-  runOnce().then(() => process.exit(0))
+  runOnce().then(() => purgeWhatsAppMessages()).then(() => process.exit(0))
 } else {
   cron.schedule('0 * * * *', () => {
     runOnce().catch((e) => console.error(e))
   })
-  console.log('[cron] price-sync scheduled hourly')
+  // Purga diaria a las 03:00 UTC
+  cron.schedule('0 3 * * *', () => {
+    purgeWhatsAppMessages().catch((e) => console.error(e))
+  })
+  console.log('[cron] price-sync hourly, wa-purge daily')
 }
