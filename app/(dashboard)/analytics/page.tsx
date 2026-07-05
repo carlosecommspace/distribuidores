@@ -7,6 +7,7 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/Table'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { formatUSD, formatBs, formatNumber, formatRelative } from '@/lib/utils'
 import { RevenueChart } from '@/components/analytics/RevenueChart'
+import { AiInsights } from '@/components/analytics/AiInsights'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -76,6 +77,8 @@ export default function AnalyticsPage() {
             <Stat label="Transacciones" value={data.transactions} />
             <Stat label="Ticket promedio" value={formatUSD(data.avgTicket)} />
           </div>
+
+          <AiInsights period={period} />
 
           <Card className="mb-6">
             <CardHeader><CardTitle>Ventas diarias</CardTitle></CardHeader>
