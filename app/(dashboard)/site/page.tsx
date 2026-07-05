@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardHeader, CardTitle, CardBody } from '@/components/ui/Card'
 import { Input, Textarea } from '@/components/ui/Input'
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { toast } from '@/components/ui/Toast'
-import { Globe, Sparkles, Upload, X, Image as ImageIcon, ExternalLink } from 'lucide-react'
+import { Globe, Sparkles, Upload, X, Image as ImageIcon, ExternalLink, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Template = 'modern' | 'warm' | 'minimal'
@@ -87,6 +87,11 @@ export default function SitePage() {
 
   const setField = <K extends keyof Site>(k: K, v: Site[K]) => setSite((s) => ({ ...s, [k]: v }))
 
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
   const save = async () => {
     if (!site.businessName.trim()) {
       toast.error('Falta el nombre del negocio')
@@ -142,32 +147,51 @@ export default function SitePage() {
     const form = new FormData()
     form.set('file', file)
     form.set('purpose', purpose)
-    const r = await fetch('/api/uploads', { method: 'POST', body: form })
-    const d = await r.json().catch(() => ({}))
-    if (!r.ok) {
-      toast.error(typeof d.error === 'string' ? d.error : 'Error subiendo archivo')
+    try {
+      const r = await fetch('/api/uploads', { method: 'POST', body: form })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        toast.error(typeof d.error === 'string' ? d.error : `Error subiendo archivo (${r.status})`)
+        return null
+      }
+      return d.id as string
+    } catch (e) {
+      toast.error('Error de red al subir el archivo')
+      console.error('[upload]', e)
       return null
     }
-    return d.id as string
   }
 
   const onLogo = async (file: File) => {
+    setUploadingLogo(true)
     const id = await upload(file, 'site_logo')
+    setUploadingLogo(false)
     if (id) setField('logoFileId', id)
   }
 
   const onAddImage = async (file: File) => {
-    if (site.imageFileIds.length >= 7) {
-      toast.error('Máximo 7 imágenes')
-      return
-    }
+    setUploadingImage(true)
     const id = await upload(file, 'site_image')
-    if (id) setField('imageFileIds', [...site.imageFileIds, id])
+    setUploadingImage(false)
+    if (id) {
+      // Usar el updater funcional para no perder actualizaciones si el usuario
+      // sube varias imagenes en rapida sucesion.
+      setSite((s) => {
+        if (s.imageFileIds.length >= 7) {
+          toast.error('Máximo 7 imágenes')
+          return s
+        }
+        return { ...s, imageFileIds: [...s.imageFileIds, id] }
+      })
+    }
   }
 
   const removeImage = (idx: number) => {
-    setField('imageFileIds', site.imageFileIds.filter((_, i) => i !== idx))
+    setSite((s) => ({ ...s, imageFileIds: s.imageFileIds.filter((_, i) => i !== idx) }))
   }
+
+  const pickLogo = () => logoInputRef.current?.click()
+  const pickImage = () => imageInputRef.current?.click()
 
   const publicUrl = useMemo(() => {
     if (!site.slug) return ''
@@ -342,14 +366,58 @@ export default function SitePage() {
             </CardBody>
           </Card>
 
+          {/* Inputs de archivo a nivel del formulario. */}
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/png,image/webp,image/svg+xml"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) onLogo(f)
+              e.target.value = ''
+            }}
+          />
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) onAddImage(f)
+              e.target.value = ''
+            }}
+          />
+
           <Card>
             <CardHeader><CardTitle>Logo</CardTitle></CardHeader>
             <CardBody>
-              <LogoUploader
-                fileId={site.logoFileId}
-                onUpload={onLogo}
-                onClear={() => setField('logoFileId', null)}
-              />
+              {site.logoFileId ? (
+                <div className="flex items-center gap-3">
+                  <div className="h-16 w-16 rounded bg-surface-2 border border-border flex items-center justify-center overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/uploads/${site.logoFileId}`} alt="logo" className="h-full w-full object-contain" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm text-text-primary">Logo cargado</div>
+                    <div className="flex gap-3 mt-0.5">
+                      <button type="button" onClick={pickLogo} className="text-xs text-accent hover:underline">Reemplazar</button>
+                      <button type="button" onClick={() => setField('logoFileId', null)} className="text-xs text-danger hover:underline">Quitar</button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={pickLogo}
+                  disabled={uploadingLogo}
+                  className="w-full flex items-center justify-center gap-2 border border-dashed border-border rounded-md py-6 text-sm text-text-secondary hover:bg-surface-2 disabled:opacity-50"
+                >
+                  {uploadingLogo ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+                  {uploadingLogo ? 'Subiendo…' : 'Subir logo (PNG, WEBP o SVG · máx. 500 KB)'}
+                </button>
+              )}
             </CardBody>
           </Card>
 
@@ -366,25 +434,33 @@ export default function SitePage() {
                   <div key={id} className="relative aspect-[4/3] rounded-md overflow-hidden bg-surface-2 border border-border">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`/api/uploads/${id}`} alt={`imagen ${i + 1}`} className="w-full h-full object-cover" />
-                    <button onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/70 hover:bg-black text-white rounded p-1">
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      className="absolute top-1 right-1 bg-black/70 hover:bg-black text-white rounded p-1"
+                      aria-label="Quitar imagen"
+                    >
                       <X size={12} />
                     </button>
                   </div>
                 ))}
                 {site.imageFileIds.length < 7 && (
-                  <label className="aspect-[4/3] flex items-center justify-center gap-1.5 border border-dashed border-border rounded-md text-xs text-text-secondary hover:bg-surface-2 cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0]
-                        if (f) onAddImage(f)
-                        e.target.value = ''
-                      }}
-                    />
-                    <Upload size={13} /> Añadir
-                  </label>
+                  <button
+                    type="button"
+                    onClick={pickImage}
+                    disabled={uploadingImage}
+                    className="aspect-[4/3] flex flex-col items-center justify-center gap-1 border border-dashed border-border rounded-md text-xs text-text-secondary hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" /> Subiendo…
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={14} /> Añadir
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
               <div className="text-xs text-text-muted">JPG, PNG o WEBP. Hasta 1 MB por imagen.</div>
@@ -420,38 +496,6 @@ function ColorField({ label, hint, value, onChange }: { label: string; hint: str
       </div>
       <div className="text-xs text-text-muted mt-1">{hint}</div>
     </div>
-  )
-}
-
-function LogoUploader({ fileId, onUpload, onClear }: { fileId: string | null; onUpload: (f: File) => void; onClear: () => void }) {
-  if (fileId) {
-    return (
-      <div className="flex items-center gap-3">
-        <div className="h-16 w-16 rounded bg-surface-2 border border-border flex items-center justify-center overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/uploads/${fileId}`} alt="logo" className="h-full w-full object-contain" />
-        </div>
-        <div className="flex-1">
-          <div className="text-sm text-text-primary">Logo cargado</div>
-          <button onClick={onClear} className="text-xs text-danger hover:underline">Quitar</button>
-        </div>
-      </div>
-    )
-  }
-  return (
-    <label className="flex items-center justify-center gap-2 border border-dashed border-border rounded-md py-6 text-sm text-text-secondary hover:bg-surface-2 cursor-pointer">
-      <input
-        type="file"
-        accept="image/png,image/webp,image/svg+xml"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0]
-          if (f) onUpload(f)
-          e.target.value = ''
-        }}
-      />
-      <ImageIcon size={14} /> Subir logo (PNG, WEBP o SVG · máx. 500 KB)
-    </label>
   )
 }
 
