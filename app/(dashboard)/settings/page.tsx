@@ -24,6 +24,9 @@ export default function SettingsPage() {
     primaryCurrency: 'USD' as 'USD' | 'EUR',
     defaultMargin: 0.15,
     waPhoneNumber: '',
+    waRetentionDays: 90,
+    waAiEnabled: false,
+    waAiPrompt: '',
     mlAutoAnswer: false,
     mlAutoSync: true,
     mlSyncInterval: 60,
@@ -244,13 +247,55 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader><CardTitle>WhatsApp</CardTitle></CardHeader>
-          <CardBody>
+          <CardBody className="flex flex-col gap-4">
             <Input
               label="Número de negocio"
               placeholder="+58412..."
+              hint="Solo referencia visual. La conexión real se hace en /whatsapp con QR."
               value={settings.waPhoneNumber}
               onChange={(e) => setSettings({ ...settings, waPhoneNumber: e.target.value })}
             />
+
+            <Select
+              label="Retención de mensajes"
+              value={String(settings.waRetentionDays)}
+              onChange={(e) => setSettings({ ...settings, waRetentionDays: Number(e.target.value) })}
+              options={[
+                { value: '0', label: 'Modo privado (no guardar contenido)' },
+                { value: '30', label: '30 días' },
+                { value: '90', label: '90 días (recomendado)' },
+                { value: '180', label: '180 días' },
+                { value: '365', label: '1 año' },
+                { value: '-1', label: 'Sin límite' },
+              ]}
+            />
+            <div className="text-xs text-text-muted -mt-2">
+              Los mensajes viejos se borran automáticamente cada día. En modo privado sólo guardamos metadata (contacto, fecha) — desactiva bot IA y búsqueda.
+            </div>
+
+            <Switch
+              checked={settings.waAiEnabled}
+              onCheckedChange={(v) => setSettings({ ...settings, waAiEnabled: v })}
+              label="Chatbot IA disponible"
+              hint="Cuando está activo, cada conversación tiene un toggle para dejar que la IA responda"
+            />
+
+            {settings.waAiEnabled && (
+              <div>
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wide mb-1.5 block">
+                  Prompt del bot (opcional)
+                </label>
+                <textarea
+                  className="input-base min-h-[100px] resize-y"
+                  placeholder="Eres el asistente de mi distribuidora. Responde en español, tono profesional pero cercano..."
+                  value={settings.waAiPrompt}
+                  onChange={(e) => setSettings({ ...settings, waAiPrompt: e.target.value })}
+                />
+                <div className="text-xs text-text-muted mt-1">
+                  Si lo dejas vacío, usa un prompt genérico razonable.
+                </div>
+              </div>
+            )}
           </CardBody>
         </Card>
 

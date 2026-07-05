@@ -3,10 +3,10 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardHeader, CardTitle, CardBody } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { CopyLinkButton } from '@/components/whatsapp/CopyLink'
 import { QuickReplyManager } from '@/components/whatsapp/QuickReplyManager'
-import { Phone, Link as LinkIcon, MessageCircle } from 'lucide-react'
+import { WhatsAppConnection } from '@/components/whatsapp/WhatsAppConnection'
+import { Link as LinkIcon, MessageCircle } from 'lucide-react'
 
 export default async function WhatsappPage() {
   const session = await auth()
@@ -14,7 +14,6 @@ export default async function WhatsappPage() {
   const userId = (session.user as { id: string }).id
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
-  const settings = await prisma.settings.findUnique({ where: { userId } })
   const replies = await prisma.quickReply.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } })
 
   // Si el usuario no tiene slug, generar uno simple basado en id
@@ -26,24 +25,7 @@ export default async function WhatsappPage() {
       <PageHeader title="WhatsApp" subtitle="Gestiona tu catálogo y respuestas rápidas" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Phone size={16} /> Configuración</CardTitle>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-wider text-text-secondary mb-1">Número de negocio</div>
-              <div className="text-sm font-mono">{settings?.waPhoneNumber || 'No configurado'}</div>
-            </div>
-            <div>
-              <div className="text-xs uppercase tracking-wider text-text-secondary mb-1">Estado de conexión</div>
-              <Badge tone="warning">Próximamente: WhatsApp Business API</Badge>
-              <p className="text-xs text-text-muted mt-2">
-                Mientras tanto puedes compartir tu catálogo público y usar respuestas rápidas.
-              </p>
-            </div>
-          </CardBody>
-        </Card>
+        <WhatsAppConnection />
 
         <Card>
           <CardHeader>

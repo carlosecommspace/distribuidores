@@ -30,6 +30,8 @@ model User {
   requests      ProductRequest[]
   notifications Notification[]
   paymentMethods PaymentMethod[]
+  waSession     WhatsAppSession?
+  waContacts    WhatsAppContact[]
   mlConnection  MLConnection?
   settings      Settings?
 }
@@ -115,6 +117,9 @@ model Settings {
   waPhoneNumber   String?
   waApiToken      String?
   waWebhookSecret String?
+  waRetentionDays Int       @default(90)     // retención de mensajes; 0 = modo privado (solo metadata)
+  waAiEnabled     Boolean   @default(false)  // toggle IA global
+  waAiPrompt      String?                    // prompt system del bot
 
   mlAutoAnswer    Boolean   @default(false)
   mlAutoSync      Boolean   @default(true)
@@ -224,6 +229,7 @@ model Client {
 
   portalUser     User?     @relation("ClientPortalUser")
   requests       ProductRequest[]
+  waContacts     WhatsAppContact[]
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -448,4 +454,87 @@ model QuickReply {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// WhatsApp — sesión Baileys por tenant, contactos, mensajes.
+// El authState va cifrado (AES-GCM) con la clave WA_ENCRYPTION_KEY del server.
+// -----------------------------------------------------------------------------
+
+model WhatsAppSession {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // status: disconnected | connecting | qr_pending | connected | banned
+  status        String    @default("disconnected")
+  provider      String    @default("baileys") // baileys | cloud_api
+
+  phoneNumber   String?   // se llena al conectarse
+  displayName   String?
+  qrCode        String?   // último QR string (para render en front); expira rápido
+  qrGeneratedAt DateTime?
+
+  // authState cifrado (AES-256-GCM). Sin cifrar en dev si WA_ENCRYPTION_KEY vacío.
+  authState     Bytes?
+  authVersion   Int       @default(1)
+
+  connectedAt   DateTime?
+  disconnectedAt DateTime?
+  lastActivity  DateTime?
+  lastError     String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+}
+
+model WhatsAppContact {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  phoneNumber   String    // E.164 sin +, ej "584121234567"
+  name          String?   // display name enviado por WA
+  clientId      String?
+  client        Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  unreadCount   Int       @default(0)
+  lastMessageAt DateTime?
+  lastMessagePreview String?
+  lastDirection String?   // in | out
+  aiEnabled     Boolean   @default(false)
+  archived      Boolean   @default(false)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  messages      WhatsAppMessage[]
+
+  @@unique([userId, phoneNumber])
+  @@index([userId, lastMessageAt])
+  @@index([clientId])
+}
+
+model WhatsAppMessage {
+  id            String   @id @default(cuid())
+  userId        String
+  contactId     String
+  contact       WhatsAppContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  externalId    String?  // ID de mensaje en WA (unique key para dedup)
+  direction     String   // in | out
+  content       String   // texto plano; puede ser vacío si es solo media
+  mediaUrl      String?  // URL en /api/uploads/[id] si es media descargada
+  mediaType     String?  // image | audio | video | document | sticker
+  status        String   @default("sent") // queued | sent | delivered | read | failed
+  respondedByBot Boolean @default(false)
+  errorMessage  String?
+
+  createdAt     DateTime @default(now())
+
+  @@unique([contactId, externalId])
+  @@index([contactId, createdAt])
+  @@index([userId, createdAt])
 }
