@@ -110,7 +110,7 @@ interface BotContext {
 const CREATE_ORDER_TOOL: ClaudeTool = {
   name: 'create_order',
   description:
-    'Crea un pedido en el sistema en estado pendiente de pago. Úsalo SOLO cuando el cliente ha confirmado explícitamente qué productos y cantidades quiere ordenar. Después de crearlo, el sistema te devuelve un mensaje ya redactado para enviar al cliente — reenvíalo tal cual, sin agregar precios o links que no aparezcan ahí.',
+    'Crea un pedido en el sistema en estado pendiente de pago. Úsalo SOLO cuando el cliente ha confirmado los productos Y (si no es cliente registrado) ha compartido su nombre y teléfono real. Después de crearlo, el sistema te devuelve un mensaje ya redactado para enviar al cliente — reenvíalo tal cual, sin agregar precios o links que no aparezcan ahí.',
   input_schema: {
     type: 'object',
     properties: {
@@ -131,6 +131,14 @@ const CREATE_ORDER_TOOL: ClaudeTool = {
         type: 'string',
         description: 'Notas opcionales del cliente sobre el pedido (entrega, preferencias, etc.).',
       },
+      customer_name: {
+        type: 'string',
+        description: 'Nombre completo del cliente. Requerido si el contacto NO es cliente registrado. Omítelo si ya es cliente registrado.',
+      },
+      customer_phone: {
+        type: 'string',
+        description: 'Teléfono real del cliente en formato venezolano (ej "04141234567" o "584141234567"). Requerido si el contacto NO es cliente registrado — el identificador que muestra WhatsApp puede ser anónimo (LID) y no sirve para llamarlo. Omítelo si ya es cliente registrado.',
+      },
     },
     required: ['items'],
   },
@@ -139,15 +147,32 @@ const CREATE_ORDER_TOOL: ClaudeTool = {
 interface OrderToolInput {
   items: Array<{ sku: string; quantity: number }>
   notes?: string
+  customer_name?: string
+  customer_phone?: string
 }
 
 interface OrderToolResult {
   ok: boolean
   error?: string
+  needs_customer_info?: { missing: Array<'name' | 'phone'>; instructions: string }
   message_for_customer?: string
   code?: string
   outOfStock?: Array<{ sku: string; requested: number; available: number }>
   unknownSkus?: string[]
+}
+
+function normalizePhone(raw: string): string | null {
+  const digits = raw.replace(/[^0-9]/g, '')
+  if (digits.length < 10 || digits.length > 13) return null
+  return digits
+}
+
+// True si el phoneNumber del contacto es un LID (identificador anónimo de WA),
+// no un teléfono real. Detectamos por el sufijo @lid en el jid o por longitud.
+function contactPhoneIsLid(contact: { phoneNumber: string; jid: string | null }): boolean {
+  if (contact.jid?.includes('@lid')) return true
+  const digits = contact.phoneNumber.replace(/[^0-9]/g, '')
+  return digits.length > 14
 }
 
 async function executeCreateOrder(ctx: BotContext, input: OrderToolInput): Promise<OrderToolResult> {
@@ -209,24 +234,60 @@ async function executeCreateOrder(ctx: BotContext, input: OrderToolInput): Promi
   })
   const totalUSD = lineItems.reduce((s, x) => s + x.subtotalUSD, 0)
 
-  // Resolver cliente: si el contacto no está vinculado, crear uno tipo "wa_lead"
+  // Resolver cliente: si el contacto no está vinculado, exigir nombre + teléfono
+  // reales del cliente antes de crear uno nuevo.
   const wasRegisteredClient = !!contact.client
   let clientId = contact.clientId
   if (!clientId) {
-    const displayName = ctx.contactName || contact.name || `WhatsApp +${ctx.contactPhone}`
+    const providedName = input.customer_name?.trim() || ''
+    const providedPhoneRaw = input.customer_phone?.trim() || ''
+    const providedPhone = providedPhoneRaw ? normalizePhone(providedPhoneRaw) : null
+    const phoneIsLid = contactPhoneIsLid(contact)
+
+    const missing: Array<'name' | 'phone'> = []
+    // Nombre: aceptamos el que el bot pase, o el push name que envía WA si es
+    // razonable (más de 2 chars y no es solo un teléfono).
+    const fallbackName = (ctx.contactName || contact.name || '').trim()
+    const nameOk = providedName.length >= 2 || fallbackName.length >= 2
+    if (!nameOk) missing.push('name')
+    // Teléfono: si el phoneNumber del contacto es un LID, exigimos uno real.
+    // Si NO es LID, aceptamos el que ya trae el contacto como fallback.
+    if (phoneIsLid && !providedPhone) missing.push('phone')
+
+    if (missing.length > 0) {
+      const parts: string[] = []
+      if (missing.includes('name')) parts.push('su nombre completo')
+      if (missing.includes('phone')) parts.push('su número de teléfono real (con código de área, ej 0414... o +58414...)')
+      return {
+        ok: false,
+        error: 'Faltan datos del cliente',
+        needs_customer_info: {
+          missing,
+          instructions: `Antes de crear el pedido, pídele al cliente ${parts.join(' y ')}. NO llames create_order de nuevo hasta que responda con esos datos. Explícale que los necesitas para poder contactarlo y coordinar el pago y la entrega.`,
+        },
+      }
+    }
+
+    const finalName = providedName || fallbackName || `WhatsApp lead`
+    const finalPhone = providedPhone || (phoneIsLid ? '' : ctx.contactPhone.replace(/[^0-9]/g, ''))
+
     const newClient = await prisma.client.create({
       data: {
         userId: ctx.userId,
-        name: displayName,
-        phone: ctx.contactPhone,
+        name: finalName,
+        phone: finalPhone || null,
         type: 'wa_lead',
-        notes: 'Cliente creado automáticamente desde un pedido por WhatsApp.',
+        notes: `Cliente creado automáticamente desde un pedido por WhatsApp.${phoneIsLid ? ' El identificador de WhatsApp era anónimo (LID); el teléfono lo confirmó el cliente en la conversación.' : ''}`,
       },
     })
     clientId = newClient.id
     await prisma.whatsAppContact.update({
       where: { id: contact.id },
-      data: { clientId: newClient.id },
+      data: {
+        clientId: newClient.id,
+        // Guardar también el nombre confirmado en el contacto de WA para el inbox.
+        name: contact.name || finalName,
+      },
     })
   }
 
@@ -352,7 +413,11 @@ ${conversationText}
 INSTRUCCIONES:
 - Si el cliente pide precio/disponibilidad, responde directamente en español, breve, tono profesional.
 - Si el cliente CONFIRMA un pedido (te dice qué productos y cantidades quiere ordenar de manera clara), usa la herramienta "create_order" para registrarlo. NO uses la herramienta hasta que el cliente haya confirmado — primero cotiza, aclara dudas y confirma.
-- Cuando uses create_order y devuelva "message_for_customer", envía EXACTAMENTE ese texto al cliente (puedes agregar un saludo corto si quieres, pero no cambies el código, monto ni link).
+- Datos del cliente para el pedido:
+  - Si el contacto YA es cliente registrado (te lo indico arriba), no le pidas nombre ni teléfono: usa lo que tenemos.
+  - Si el contacto NO es cliente registrado, ANTES de llamar create_order pídele su nombre completo y su teléfono real (04xx-xxxxxxx o +58...). El identificador que muestra WhatsApp puede ser anónimo (LID) y no sirve para llamarlo. Solo cuando te los dé, llama create_order pasando "customer_name" y "customer_phone".
+- Cuando create_order devuelva "message_for_customer", envía EXACTAMENTE ese texto al cliente (puedes agregar un saludo corto, pero no cambies el código, monto ni link).
+- Si create_order devuelve "needs_customer_info", NO reintentes: sigue las "instructions" que devuelve el sistema y pídele al cliente los datos que faltan en tono amable.
 - Si el pedido falla por stock o SKU desconocido, informa al cliente en lenguaje natural (no menciones "SKU", di el nombre del producto).
 - Si el cliente pide algo que requiere confirmación humana (descuentos especiales, entregas urgentes, cambios de política), responde con la palabra literal "ESCALATE" seguida de dos puntos y una razón corta. Ej: "ESCALATE: pide descuento no autorizado".
 - No inventes precios ni stock. Si no estás seguro, ESCALATE.
