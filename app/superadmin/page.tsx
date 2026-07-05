@@ -32,13 +32,7 @@ interface Merchant {
   }
 }
 
-interface Props {
-  basePath: string
-}
-
-export function MerchantsDashboard({ basePath }: Props) {
-  const externalBase = basePath
-
+export default function SuperadminHomePage() {
   const [merchants, setMerchants] = useState<Merchant[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
@@ -50,7 +44,7 @@ export function MerchantsDashboard({ basePath }: Props) {
 
   const load = async () => {
     setLoading(true)
-    const r = await fetch('/api/system/merchants')
+    const r = await fetch('/api/superadmin/merchants')
     const d = await r.json()
     setMerchants(d.merchants || [])
     setLoading(false)
@@ -84,7 +78,7 @@ export function MerchantsDashboard({ basePath }: Props) {
       return
     }
     setCreating(true)
-    const r = await fetch('/api/system/merchants', {
+    const r = await fetch('/api/superadmin/merchants', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -109,7 +103,7 @@ export function MerchantsDashboard({ basePath }: Props) {
   const toggleActive = async (m: Merchant) => {
     const action = m.isActive ? 'suspender' : 'habilitar'
     if (!confirm(`¿${action.charAt(0).toUpperCase() + action.slice(1)} a ${m.name || m.email}?`)) return
-    const r = await fetch(`/api/system/merchants/${m.id}`, {
+    const r = await fetch(`/api/superadmin/merchants/${m.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ isActive: !m.isActive }),
@@ -121,9 +115,10 @@ export function MerchantsDashboard({ basePath }: Props) {
 
   const copyCredentials = () => {
     if (!credentials) return
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
     const text = `Bienvenido a DistribOS
 
-Portal: https://distribuidores-production.up.railway.app/login
+Portal: ${origin}/login
 Usuario: ${credentials.email}
 Contraseña: ${credentials.password}
 
@@ -232,7 +227,7 @@ Podés cambiar tu contraseña una vez adentro.`
                         >
                           {m.isActive ? 'Suspender' : 'Habilitar'}
                         </button>
-                        <Link href={`${externalBase}/merchants/${m.id}`} className="text-text-muted hover:text-accent p-1 inline-block">
+                        <Link href={`/superadmin/merchants/${m.id}`} className="text-text-muted hover:text-accent p-1 inline-block">
                           <ChevronRight size={16} />
                         </Link>
                       </div>

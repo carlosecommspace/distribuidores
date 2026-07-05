@@ -26,20 +26,6 @@ export default auth((req) => {
   const { pathname } = req.nextUrl
   const host = req.headers.get('host')
   const rootDomain = process.env.APP_ROOT_DOMAIN || ''
-  const superadminPath = (process.env.SUPERADMIN_URL_PATH || '').replace(/^\/+|\/+$/g, '')
-
-  // -------------------------------------------------------------------------
-  // 0) Portal del superadmin — path oculto controlado por env
-  // -------------------------------------------------------------------------
-  // Reescribe el path externo (env) al path interno /system. Las paginas
-  // internas verifican role=superadmin server-side y redirigen a /login si
-  // no se cumple. El acceso directo a /system tambien pasa por ese check.
-  if (superadminPath && (pathname === `/${superadminPath}` || pathname.startsWith(`/${superadminPath}/`))) {
-    const rest = pathname.slice(`/${superadminPath}`.length) || '/'
-    const url = req.nextUrl.clone()
-    url.pathname = `/system${rest === '/' ? '' : rest}`
-    return NextResponse.rewrite(url)
-  }
 
   // -------------------------------------------------------------------------
   // 1) Sitio del merchant: {slug}.APP_ROOT_DOMAIN → reescribe a /sites/{slug}
@@ -66,6 +52,7 @@ export default auth((req) => {
   const publicPaths = [
     '/login',
     '/vendedor', // login publico del vendedor (link que el merchant comparte)
+    '/superadminloginpage', // login del superadmin global
     '/api/auth',
     '/catalogo',
     '/api/ml/webhook',
@@ -77,11 +64,20 @@ export default auth((req) => {
   const isPublic = publicPaths.some((p) => pathname.startsWith(p))
 
   if (!isAuth && !isPublic) {
+    // Sin sesion en rutas del superadmin -> login del superadmin
+    if (pathname === '/superadmin' || pathname.startsWith('/superadmin/') || pathname.startsWith('/api/superadmin')) {
+      return NextResponse.redirect(new URL('/superadminloginpage', req.nextUrl.origin))
+    }
     return NextResponse.redirect(new URL('/login', req.nextUrl.origin))
   }
 
-  if (isAuth && (pathname === '/login' || pathname === '/vendedor')) {
-    const dest = role === 'client' ? '/portal' : role === 'seller' ? '/seller' : '/'
+  // Ya autenticado en pagina de login: mandarlo a su portal
+  if (isAuth && (pathname === '/login' || pathname === '/vendedor' || pathname === '/superadminloginpage')) {
+    const dest =
+      role === 'client' ? '/portal' :
+      role === 'seller' ? '/seller' :
+      role === 'superadmin' ? '/superadmin' :
+      '/'
     return NextResponse.redirect(new URL(dest, req.nextUrl.origin))
   }
 
@@ -116,23 +112,26 @@ export default auth((req) => {
     }
   }
 
-  // Admin: bloqueado el portal de cliente y el portal del vendedor
+  // Superadmin: solo /superadmin + endpoints necesarios
+  if (isAuth && role === 'superadmin') {
+    const allowed =
+      startsWithExact(pathname, '/superadmin') ||
+      startsWithExact(pathname, '/api/superadmin') ||
+      startsWithExact(pathname, '/api/auth')
+    if (!allowed && !isPublic) {
+      return NextResponse.redirect(new URL('/superadmin', req.nextUrl.origin))
+    }
+  }
+
+  // Admin: bloqueado el portal de cliente, del vendedor y del superadmin
   if (isAuth && role !== 'client' && (startsWithExact(pathname, '/portal') || startsWithExact(pathname, '/print/portal'))) {
     return NextResponse.redirect(new URL('/', req.nextUrl.origin))
   }
-  // /seller EXACTO o /seller/... — NO matchea /sellers (admin merchant CRUD)
   if (isAuth && role !== 'seller' && startsWithExact(pathname, '/seller')) {
     return NextResponse.redirect(new URL('/', req.nextUrl.origin))
   }
-
-  // Superadmin fuera del portal /system: mandarlo al portal por defecto
-  if (isAuth && role === 'superadmin' && superadminPath) {
-    // Si un superadmin entra a rutas del admin merchant (/, /inventory, etc)
-    // lo mandamos a su portal para que no se confunda con el rol de merchant
-    const isSuperOwnRoute = pathname.startsWith('/api/system') || pathname.startsWith('/api/auth')
-    if (!isSuperOwnRoute) {
-      return NextResponse.redirect(new URL(`/${superadminPath}`, req.nextUrl.origin))
-    }
+  if (isAuth && role !== 'superadmin' && (startsWithExact(pathname, '/superadmin') || startsWithExact(pathname, '/api/superadmin'))) {
+    return NextResponse.redirect(new URL('/', req.nextUrl.origin))
   }
 
   return NextResponse.next()
