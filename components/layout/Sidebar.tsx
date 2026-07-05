@@ -14,6 +14,8 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  Globe,
+  Mail,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +29,8 @@ const nav = [
   { href: '/sales', label: 'Ventas', icon: ShoppingCart },
   { href: '/mercadolibre', label: 'MercadoLibre', icon: Store },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
+  { href: '/site', label: 'Sitio web', icon: Globe },
+  { href: '/leads', label: 'Leads', icon: Mail },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/settings', label: 'Configuración', icon: Settings },
 ]

@@ -11,6 +11,14 @@ const PURPOSE_LIMITS: Record<string, { maxBytes: number; mime: Set<string> }> = 
     maxBytes: 250 * 1024, // 250 KB
     mime: new Set(['image/jpeg', 'image/png', 'image/webp']),
   },
+  site_logo: {
+    maxBytes: 500 * 1024, // 500 KB
+    mime: new Set(['image/png', 'image/webp', 'image/svg+xml']),
+  },
+  site_image: {
+    maxBytes: 1024 * 1024, // 1 MB
+    mime: new Set(['image/jpeg', 'image/png', 'image/webp']),
+  },
 }
 
 export async function POST(req: Request) {
