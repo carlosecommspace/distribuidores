@@ -15,6 +15,8 @@ import { toast } from '@/components/ui/Toast'
 import { Plus, Search, Package, Pencil, Upload, Download } from 'lucide-react'
 import Link from 'next/link'
 import { ImportProductsModal } from '@/components/inventory/ImportProductsModal'
+import { PublishToMLModal } from '@/components/ml/PublishToMLModal'
+import { Store } from 'lucide-react'
 
 interface Product {
   id: string
@@ -41,6 +43,8 @@ export default function InventoryPage() {
   const [rate, setRate] = useState(0)
   const [saving, setSaving] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [publishOpen, setPublishOpen] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -182,43 +186,94 @@ export default function InventoryPage() {
               }
             />
           ) : (
-            <Table>
-              <THead>
-                <TR>
-                  <TH>SKU</TH>
-                  <TH>Producto</TH>
-                  <TH className="text-right">Stock</TH>
-                  <TH>Estado</TH>
-                  <TH className="text-right">Precio USD</TH>
-                  <TH className="text-right">Precio Bs</TH>
-                  <TH>ML</TH>
-                  <TH></TH>
-                </TR>
-              </THead>
-              <TBody>
-                {filtered.map((p) => (
-                  <TR key={p.id}>
-                    <TD className="font-mono text-xs text-text-secondary">{p.sku}</TD>
-                    <TD>
-                      <div className="text-sm">{p.name}</div>
-                      {p.category && <div className="text-xs text-text-muted">{p.category}</div>}
-                    </TD>
-                    <TD className="text-right font-mono">
-                      {p.stock} <span className="text-text-muted text-xs">/ {p.stockMin}</span>
-                    </TD>
-                    <TD><StockBadge stock={p.stock} stockMin={p.stockMin} /></TD>
-                    <TD className="text-right font-mono">{formatUSD(p.priceUSD)}</TD>
-                    <TD className="text-right font-mono text-text-secondary">{formatBs(p.priceBs)}</TD>
-                    <TD><MLStatusBadge mlItemId={p.mlItemId} mlStatus={p.mlStatus} /></TD>
-                    <TD className="text-right">
-                      <button onClick={() => openEdit(p.id)} className="text-text-muted hover:text-accent p-1">
-                        <Pencil size={14} />
-                      </button>
-                    </TD>
+            <>
+              {selectedIds.size > 0 && (
+                <div className="px-4 sm:px-5 py-3 bg-accent-subtle border-b border-accent-border flex items-center justify-between gap-3 flex-wrap">
+                  <div className="text-sm text-text-primary">
+                    <span className="font-semibold">{selectedIds.size}</span> {selectedIds.size === 1 ? 'seleccionado' : 'seleccionados'}
+                    <button
+                      onClick={() => setSelectedIds(new Set())}
+                      className="ml-3 text-xs text-text-secondary hover:text-text-primary underline"
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                  <Button size="sm" onClick={() => setPublishOpen(true)}>
+                    <Store size={14} /> Publicar en MercadoLibre
+                  </Button>
+                </div>
+              )}
+              <Table>
+                <THead>
+                  <TR>
+                    <TH className="w-8">
+                      <input
+                        type="checkbox"
+                        aria-label="Seleccionar todos"
+                        checked={filtered.length > 0 && filtered.every((p) => selectedIds.has(p.id))}
+                        onChange={(e) => {
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev)
+                            if (e.target.checked) {
+                              filtered.forEach((p) => next.add(p.id))
+                            } else {
+                              filtered.forEach((p) => next.delete(p.id))
+                            }
+                            return next
+                          })
+                        }}
+                      />
+                    </TH>
+                    <TH>SKU</TH>
+                    <TH>Producto</TH>
+                    <TH className="text-right">Stock</TH>
+                    <TH>Estado</TH>
+                    <TH className="text-right">Precio USD</TH>
+                    <TH className="text-right">Precio Bs</TH>
+                    <TH>ML</TH>
+                    <TH></TH>
                   </TR>
-                ))}
-              </TBody>
-            </Table>
+                </THead>
+                <TBody>
+                  {filtered.map((p) => (
+                    <TR key={p.id}>
+                      <TD>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(p.id)}
+                          onChange={(e) => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.add(p.id)
+                              else next.delete(p.id)
+                              return next
+                            })
+                          }}
+                          aria-label={`Seleccionar ${p.name}`}
+                        />
+                      </TD>
+                      <TD className="font-mono text-xs text-text-secondary">{p.sku}</TD>
+                      <TD>
+                        <div className="text-sm">{p.name}</div>
+                        {p.category && <div className="text-xs text-text-muted">{p.category}</div>}
+                      </TD>
+                      <TD className="text-right font-mono">
+                        {p.stock} <span className="text-text-muted text-xs">/ {p.stockMin}</span>
+                      </TD>
+                      <TD><StockBadge stock={p.stock} stockMin={p.stockMin} /></TD>
+                      <TD className="text-right font-mono">{formatUSD(p.priceUSD)}</TD>
+                      <TD className="text-right font-mono text-text-secondary">{formatBs(p.priceBs)}</TD>
+                      <TD><MLStatusBadge mlItemId={p.mlItemId} mlStatus={p.mlStatus} /></TD>
+                      <TD className="text-right">
+                        <button onClick={() => openEdit(p.id)} className="text-text-muted hover:text-accent p-1">
+                          <Pencil size={14} />
+                        </button>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </>
           )}
         </CardBody>
       </Card>
@@ -240,6 +295,15 @@ export default function InventoryPage() {
       </Modal>
 
       <ImportProductsModal open={importOpen} onOpenChange={setImportOpen} onDone={load} />
+
+      <PublishToMLModal
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        selected={items
+          .filter((p) => selectedIds.has(p.id))
+          .map((p) => ({ id: p.id, name: p.name, sku: p.sku, priceUSD: p.priceUSD, stock: p.stock, mlItemId: p.mlItemId }))}
+        onDone={() => { setSelectedIds(new Set()); load() }}
+      />
     </div>
   )
 }

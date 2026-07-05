@@ -124,3 +124,186 @@ export async function answerMLQuestion(token: string, questionId: string, text: 
     { headers: { Authorization: `Bearer ${token}` } },
   )
 }
+
+// ----------------------------------------------------------------------------
+// Categorias y atributos — helpers para publicacion masiva
+// ----------------------------------------------------------------------------
+
+/**
+ * Usa el domain discovery de ML para predecir la categoria adecuada para un
+ * producto a partir del titulo. Site = MLV (Venezuela).
+ * Devuelve el mejor match o null si ML no sugiere nada.
+ */
+export async function predictMLCategory(
+  token: string,
+  title: string,
+  site = 'MLV',
+): Promise<{ categoryId: string; categoryName: string; predictionScore: number } | null> {
+  try {
+    const { data } = await axios.get(
+      `${ML_BASE}/sites/${site}/domain_discovery/search`,
+      {
+        params: { q: title, limit: 1 },
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
+    const first = Array.isArray(data) ? data[0] : null
+    if (!first?.category_id) return null
+    return {
+      categoryId: first.category_id,
+      categoryName: first.category_name || first.domain_name || '',
+      predictionScore: typeof first.prediction_probability === 'number' ? first.prediction_probability : 0,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Trae los atributos requeridos por una categoria (marca, modelo, tipo, etc).
+ * Los usamos para armar el payload de publish y detectar si falta algo.
+ */
+export async function fetchMLCategoryAttributes(
+  token: string,
+  categoryId: string,
+): Promise<Array<{ id: string; name: string; required: boolean; valueType: string; values: Array<{ id: string; name: string }> }>> {
+  try {
+    const { data } = await axios.get(`${ML_BASE}/categories/${categoryId}/attributes`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!Array.isArray(data)) return []
+    return data.map((a) => ({
+      id: a.id,
+      name: a.name,
+      required: !!(a.tags?.required || a.tags?.catalog_required || a.value_type === 'list'
+        && Array.isArray(a.tags) && a.tags.includes('required')),
+      valueType: a.value_type,
+      values: Array.isArray(a.values)
+        ? a.values.slice(0, 20).map((v: { id: string; name: string }) => ({ id: v.id, name: v.name }))
+        : [],
+    }))
+  } catch {
+    return []
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Publish avanzado
+// ----------------------------------------------------------------------------
+
+interface PublishPayload {
+  title: string
+  categoryId: string
+  priceUSD: number
+  stock: number
+  listingType: string
+  description?: string
+  pictures?: string[]
+  attributes?: Array<{ id: string; value_name?: string; value_id?: string }>
+}
+
+interface PublishResult {
+  ok: boolean
+  mlItemId?: string
+  status?: string
+  permalink?: string
+  error?: string
+  errorCause?: unknown
+}
+
+export async function publishMLItemFull(token: string, payload: PublishPayload): Promise<PublishResult> {
+  try {
+    const { data } = await axios.post(
+      `${ML_BASE}/items`,
+      {
+        title: payload.title.slice(0, 60), // ML max title = 60 chars
+        category_id: payload.categoryId,
+        price: payload.priceUSD,
+        currency_id: 'USD',
+        available_quantity: payload.stock,
+        buying_mode: 'buy_it_now',
+        listing_type_id: payload.listingType,
+        condition: 'new',
+        description: { plain_text: payload.description || '' },
+        pictures: (payload.pictures || []).slice(0, 12).map((url) => ({ source: url })),
+        attributes: payload.attributes,
+      },
+      { headers: { Authorization: `Bearer ${token}` } },
+    )
+    return {
+      ok: true,
+      mlItemId: data.id as string,
+      status: data.status as string,
+      permalink: data.permalink as string,
+    }
+  } catch (e) {
+    if (axios.isAxiosError(e)) {
+      const body = e.response?.data as { message?: string; cause?: unknown } | undefined
+      return {
+        ok: false,
+        error: body?.message || e.message,
+        errorCause: body?.cause,
+      }
+    }
+    return { ok: false, error: e instanceof Error ? e.message : 'error' }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Orders (webhook Fase 3)
+// ----------------------------------------------------------------------------
+
+export interface MLOrder {
+  id: number
+  status: string
+  status_detail: string | null
+  date_created: string
+  total_amount: number
+  currency_id: string
+  paid_amount: number
+  buyer: {
+    id: number
+    nickname?: string
+    first_name?: string
+    last_name?: string
+    email?: string
+    phone?: { area_code?: string; number?: string }
+  }
+  order_items: Array<{
+    item: { id: string; title: string; seller_sku?: string; category_id?: string; variation_id?: number }
+    quantity: number
+    unit_price: number
+    currency_id: string
+  }>
+  payments?: Array<{ id: number; status: string; payment_method_id?: string; payment_type?: string; transaction_amount: number }>
+  shipping?: { id?: number }
+}
+
+export async function fetchMLOrder(token: string, orderId: string | number): Promise<MLOrder | null> {
+  try {
+    const { data } = await axios.get(`${ML_BASE}/orders/${orderId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return data as MLOrder
+  } catch {
+    return null
+  }
+}
+
+export async function fetchMLQuestion(token: string, questionId: string | number) {
+  try {
+    const { data } = await axios.get(`${ML_BASE}/questions/${questionId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    return data as {
+      id: number
+      text: string
+      status: string
+      item_id: string
+      date_created: string
+      from: { id?: number; nickname?: string }
+    }
+  } catch {
+    return null
+  }
+}
