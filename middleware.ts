@@ -31,14 +31,9 @@ export default auth((req) => {
   // -------------------------------------------------------------------------
   // 0) Portal del superadmin — path oculto controlado por env
   // -------------------------------------------------------------------------
-  // Bloqueamos acceso directo a /system con 404 (para evitar leaks del path
-  // interno si alguien lo descubriera)
-  if (pathname === '/system' || pathname.startsWith('/system/')) {
-    return new NextResponse('Not Found', { status: 404 })
-  }
-  // Si el path externo matchea el SUPERADMIN_URL_PATH, lo reescribimos a
-  // /system para que Next.js sirva las paginas internas. Las paginas hacen
-  // su propio check de role=superadmin.
+  // Reescribe el path externo (env) al path interno /system. Las paginas
+  // internas verifican role=superadmin server-side y redirigen a /login si
+  // no se cumple. El acceso directo a /system tambien pasa por ese check.
   if (superadminPath && (pathname === `/${superadminPath}` || pathname.startsWith(`/${superadminPath}/`))) {
     const rest = pathname.slice(`/${superadminPath}`.length) || '/'
     const url = req.nextUrl.clone()
