@@ -19,6 +19,7 @@ import {
   BadgeCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Logo } from '@/components/brand/Logo'
 
 const nav = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -47,11 +48,14 @@ export function Sidebar({ user, onNavigate }: Props) {
   return (
     <aside className="flex flex-col w-[260px] bg-surface border-r border-border h-screen">
       <div className="px-6 py-6 border-b border-border">
-        <Link href="/" onClick={onNavigate} className="flex items-baseline gap-1.5">
-          <span className="font-display font-bold text-xl text-text-primary">Distrib</span>
-          <span className="font-display font-bold text-xl text-accent">OS</span>
+        <Link href="/" onClick={onNavigate} className="flex items-center gap-2.5">
+          <Logo size={32} />
+          <span className="font-display font-bold text-xl leading-none">
+            <span className="text-text-primary">Distrib</span>
+            <span className="text-accent">OS</span>
+          </span>
         </Link>
-        <div className="text-[11px] text-text-muted mt-1 uppercase tracking-wider">Sistema operativo</div>
+        <div className="text-[11px] text-text-muted mt-2 uppercase tracking-wider">Sistema operativo</div>
       </div>
       <nav className="flex-1 py-4 px-3 flex flex-col gap-0.5 overflow-y-auto">
         {nav.map((item) => {

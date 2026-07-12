@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { toast } from '@/components/ui/Toast'
 import { ToastViewport } from '@/components/ui/Toast'
 import { Lock } from 'lucide-react'
+import { Logo } from '@/components/brand/Logo'
 
 export default function SuperadminLoginPage() {
   const [email, setEmail] = useState('')
@@ -44,11 +45,14 @@ export default function SuperadminLoginPage() {
             <div className="inline-flex items-center gap-2 text-text-muted text-xs uppercase tracking-widest mb-4">
               <Lock size={12} /> System Console
             </div>
-            <div className="inline-flex items-baseline gap-1.5">
-              <span className="font-display font-bold text-3xl text-text-primary">Distrib</span>
-              <span className="font-display font-bold text-3xl text-accent">OS</span>
+            <div className="inline-flex items-center gap-3">
+              <Logo size={44} />
+              <span className="font-display font-bold text-3xl leading-none">
+                <span className="text-text-primary">Distrib</span>
+                <span className="text-accent">OS</span>
+              </span>
             </div>
-            <p className="text-sm text-text-secondary mt-2">Portal del administrador global</p>
+            <p className="text-sm text-text-secondary mt-3">Portal del administrador global</p>
           </div>
 
           <form onSubmit={onSubmit} className="bg-surface border border-border rounded-lg p-7 flex flex-col gap-4">

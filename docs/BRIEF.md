@@ -325,6 +325,27 @@ No todavía. Es parte del roadmap. Por ahora emitimos comprobantes internos.
 
 ---
 
+## 🎨 Identidad de marca
+
+**Nombre**: DistribOS (wordmark en dos tonos: "Distrib" cream, "OS" amber).
+
+**Símbolo**: cuadrado oscuro redondeado con chevron `>` cream y una barra vertical amber a la derecha. Semánticamente: *play + control* — el sistema corre solo, y el distribuidor tiene el botón de pausa.
+
+**Paleta**:
+| Rol            | Hex        |
+|----------------|------------|
+| Fondo (ink)    | `#0F0F0F`  |
+| Superficie     | `#1A1A1A`  |
+| Texto (cream)  | `#F5F3EF`  |
+| Acento (amber) | `#F5A623`  |
+
+**Tipografía**: Syne (display), DM Sans (body), DM Mono (números).
+
+Referencia canónica y variantes de logo: `docs/brand/DistribOS-Identidad-Logos.html`.
+Componente reutilizable: `components/brand/Logo.tsx`.
+
+---
+
 ## 📝 Guías de tono para generación de contenido
 
 ### Voz de marca
@@ -361,4 +382,4 @@ No todavía. Es parte del roadmap. Por ahora emitimos comprobantes internos.
 
 ---
 
-**Última actualización**: 2026-07 (versión post-PR #49, con superadmin, vendedores, sitio web, MercadoLibre publicación masiva, IA en analytics y WhatsApp).
+**Última actualización**: 2026-07 (versión post-PR #50, con superadmin, vendedores, sitio web, MercadoLibre publicación masiva, IA en analytics, WhatsApp e identidad visual DistribOS aplicada).

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { LayoutDashboard } from 'lucide-react'
 import { ToastViewport } from '@/components/ui/Toast'
 import { SignOutButton } from '@/components/auth/SignOutButton'
+import { Logo } from '@/components/brand/Logo'
 
 /**
  * Layout del portal del superadmin. Requiere role=superadmin en todas las
@@ -20,9 +21,12 @@ export default async function SuperadminLayout({ children }: { children: React.R
     <div className="min-h-screen flex flex-col bg-bg">
       <header className="border-b border-border bg-surface/60 backdrop-blur sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-4">
-          <Link href="/superadmin" className="flex items-baseline gap-1.5">
-            <span className="font-display font-bold text-lg text-text-primary">Distrib</span>
-            <span className="font-display font-bold text-lg text-accent">OS</span>
+          <Link href="/superadmin" className="flex items-center gap-2">
+            <Logo size={22} />
+            <span className="font-display font-bold text-lg leading-none">
+              <span className="text-text-primary">Distrib</span>
+              <span className="text-accent">OS</span>
+            </span>
             <span className="font-mono text-[10px] text-text-muted ml-2 uppercase tracking-widest">System Console</span>
           </Link>
           <nav className="flex items-center gap-1 ml-4">
