@@ -116,17 +116,49 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const period = (body?.period as string) || '30d'
-  const periodDays = period === 'today' ? 1 : period === '7d' ? 7 : period === '90d' ? 90 : 30
+  const fromParam = body?.from as string | undefined
+  const toParam = body?.to as string | undefined
 
   const now = new Date()
-  const from = daysBack(periodDays)
-  const prevFrom = daysBack(periodDays * 2)
+  let period: string
+  let periodDays: number
+  let from: Date
+  let to: Date | null = null
+
+  if (fromParam) {
+    const parsedFrom = new Date(fromParam)
+    if (isNaN(parsedFrom.getTime())) {
+      return NextResponse.json({ error: 'from inválido' }, { status: 400 })
+    }
+    from = parsedFrom
+    if (toParam) {
+      const parsedTo = new Date(toParam)
+      if (!isNaN(parsedTo.getTime())) {
+        to = parsedTo
+        to.setHours(23, 59, 59, 999)
+      }
+    }
+    const end = to || now
+    periodDays = Math.max(1, Math.round((end.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)))
+    period = 'custom'
+  } else {
+    period = (body?.period as string) || '30d'
+    periodDays = period === 'today' ? 1
+      : period === '7d' ? 7
+      : period === '90d' ? 90
+      : period === 'ytd' ? Math.max(1, Math.round((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (24 * 60 * 60 * 1000)))
+      : 30
+    from = daysBack(periodDays)
+  }
+  const prevFrom = new Date(from.getTime() - periodDays * 24 * 60 * 60 * 1000)
 
   // Ventas del periodo actual + previo (para comparar) + inventario + clientes
   const [sales, prevSales, products, clients, waLeadsCount] = await Promise.all([
     prisma.sale.findMany({
-      where: { userId, createdAt: { gte: from } },
+      where: {
+        userId,
+        createdAt: to ? { gte: from, lte: to } : { gte: from },
+      },
       include: { items: { include: { product: true } }, client: true },
     }),
     prisma.sale.findMany({
@@ -146,7 +178,12 @@ export async function POST(req: Request) {
         id: true, name: true, company: true, totalPurchases: true, lastPurchase: true, type: true,
       },
     }),
-    prisma.websiteLead.count({ where: { userId, createdAt: { gte: from } } }).catch(() => 0),
+    prisma.websiteLead.count({
+      where: {
+        userId,
+        createdAt: to ? { gte: from, lte: to } : { gte: from },
+      },
+    }).catch(() => 0),
   ])
 
   // Totales

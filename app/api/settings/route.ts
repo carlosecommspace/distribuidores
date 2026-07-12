@@ -15,11 +15,10 @@ export async function GET() {
   return NextResponse.json({ settings, user, rateLogs })
 }
 
+// Nota: los campos de tasa (exchangeRate, autoUpdateRate, eurExchangeRate,
+// autoUpdateEurRate) no se aceptan en el patch — la tasa la gestiona el
+// superadmin, se propaga automaticamente y se ignora si viene desde acá.
 type SettingsPatch = Partial<{
-  exchangeRate: number
-  autoUpdateRate: boolean
-  eurExchangeRate: number
-  autoUpdateEurRate: boolean
   primaryCurrency: 'USD' | 'EUR'
   defaultMargin: number
   waPhoneNumber: string
@@ -58,12 +57,9 @@ export async function PATCH(req: Request) {
     })
   }
 
-  // Si tocaron tasa USD/EUR o cambio de moneda principal, recalcula priceBs con la tasa principal vigente
-  if (updated && (
-    settingsPatch?.exchangeRate !== undefined ||
-    settingsPatch?.eurExchangeRate !== undefined ||
-    settingsPatch?.primaryCurrency !== undefined
-  )) {
+  // Si cambio la moneda principal, recalcular priceBs con la tasa vigente
+  // de la nueva moneda principal.
+  if (updated && settingsPatch?.primaryCurrency !== undefined) {
     const activeRate = updated.primaryCurrency === 'EUR' ? updated.eurExchangeRate : updated.exchangeRate
     if (activeRate > 0) {
       await prisma.$executeRaw`UPDATE "Product" SET "priceBs" = "priceUSD" * ${activeRate} WHERE "userId" = ${userId}`

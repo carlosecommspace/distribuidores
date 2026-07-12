@@ -1,19 +1,17 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card, CardBody } from '@/components/ui/Card'
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/Table'
 import { Badge } from '@/components/ui/Badge'
-import { Modal } from '@/components/ui/Modal'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Stat } from '@/components/ui/Stat'
 import { Select } from '@/components/ui/Select'
-import { SaleForm, emptySale, type SaleFormValues } from '@/components/sales/SaleForm'
-import { toast } from '@/components/ui/Toast'
 import { formatUSD, formatBs, formatDateTime } from '@/lib/utils'
-import { Plus, ShoppingCart } from 'lucide-react'
+import { ShoppingCart, Info, Inbox } from 'lucide-react'
 
 interface Sale {
   id: string
@@ -30,11 +28,7 @@ interface Sale {
 export default function SalesPage() {
   const [items, setItems] = useState<Sale[]>([])
   const [loading, setLoading] = useState(true)
-  const [open, setOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [channelFilter, setChannelFilter] = useState('')
-  const [rate, setRate] = useState(0)
-  const [form, setForm] = useState<SaleFormValues>(emptySale(0))
 
   const load = async () => {
     setLoading(true)
@@ -45,41 +39,7 @@ export default function SalesPage() {
     setLoading(false)
   }
 
-  useEffect(() => {
-    fetch('/api/settings').then((r) => r.json()).then((d) => {
-      const r = d?.settings?.exchangeRate || 0
-      setRate(r)
-      setForm(emptySale(r))
-    })
-  }, [])
-
   useEffect(() => { load() }, [channelFilter])
-
-  const onSave = async () => {
-    if (form.items.length === 0) {
-      toast.error('Agrega al menos un producto')
-      return
-    }
-    setSaving(true)
-    const r = await fetch('/api/sales', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        items: form.items.map((i) => ({ productId: i.productId, quantity: i.quantity, priceUSD: i.priceUSD })),
-      }),
-    })
-    setSaving(false)
-    if (!r.ok) {
-      const e = await r.json().catch(() => ({}))
-      toast.error(typeof e.error === 'string' ? e.error : 'Error guardando la venta')
-      return
-    }
-    toast.success('Venta registrada')
-    setOpen(false)
-    setForm(emptySale(rate))
-    load()
-  }
 
   const stats = useMemo(() => {
     const totalUSD = items.reduce((s, x) => s + x.totalUSD, 0)
@@ -91,13 +51,27 @@ export default function SalesPage() {
     <div>
       <PageHeader
         title="Ventas"
-        subtitle="Registra y consulta tus ventas de todos los canales"
+        subtitle="Historial de ventas cerradas — se generan al liberar un pedido"
         actions={
-          <Button onClick={() => { setForm(emptySale(rate)); setOpen(true) }}>
-            <Plus size={16} /> Registrar venta
-          </Button>
+          <Link href="/requests">
+            <Button variant="secondary">
+              <Inbox size={14} /> Ir a pedidos
+            </Button>
+          </Link>
         }
       />
+
+      <div className="bg-info-subtle border border-info/30 rounded-md p-3 mb-6 flex items-start gap-2 text-sm">
+        <Info size={16} className="text-info shrink-0 mt-0.5" />
+        <div>
+          <div className="text-info font-medium">Las ventas se registran desde pedidos</div>
+          <div className="text-xs text-text-secondary mt-1">
+            Para cerrar una venta, primero creá o abrí un pedido en <Link href="/requests" className="text-accent hover:underline">/requests</Link>,
+            cobralo y liberalo. Al liberarlo, se genera automáticamente la venta acá con su pago, canal y cliente.
+            Esto asegura que el flujo <span className="font-medium">pedido → pago → despacho → venta</span> quede completo y trazable.
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6">
         <Stat label="Total período (USD)" value={formatUSD(stats.totalUSD)} accent />
@@ -129,8 +103,8 @@ export default function SalesPage() {
             <EmptyState
               icon={<ShoppingCart size={32} />}
               title="Sin ventas todavía"
-              description="Registra tu primera venta para empezar a ver tus métricas."
-              action={<Button onClick={() => setOpen(true)}><Plus size={16} /> Registrar venta</Button>}
+              description="Cuando liberes un pedido de /requests aparecerá acá como venta cerrada."
+              action={<Link href="/requests"><Button><Inbox size={14} /> Ir a pedidos</Button></Link>}
             />
           ) : (
             <Table>
@@ -164,21 +138,6 @@ export default function SalesPage() {
           )}
         </CardBody>
       </Card>
-
-      <Modal
-        open={open}
-        onOpenChange={setOpen}
-        title="Registrar venta"
-        size="xl"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button loading={saving} onClick={onSave}>Guardar venta</Button>
-          </>
-        }
-      >
-        <SaleForm value={form} onChange={setForm} />
-      </Modal>
     </div>
   )
 }
