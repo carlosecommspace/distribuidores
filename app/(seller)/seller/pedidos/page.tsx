@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { formatUSD, formatRelative } from '@/lib/utils'
-import { Inbox, Plus } from 'lucide-react'
+import { Inbox, Plus, ArrowRight } from 'lucide-react'
 
 interface Request {
   id: string
@@ -66,24 +66,44 @@ export default function MyRequestsPage() {
                   <TH>Cliente</TH>
                   <TH className="text-right">Productos</TH>
                   <TH className="text-right">Total</TH>
+                  <TH className="text-right">Saldo</TH>
                   <TH>Estado</TH>
                   <TH>Creado</TH>
+                  <TH></TH>
                 </TR>
               </THead>
               <TBody>
-                {requests.map((r) => (
-                  <TR key={r.id}>
-                    <TD className="font-mono text-sm">{r.code || r.id.slice(0, 8)}</TD>
-                    <TD>
-                      <div className="text-sm">{r.client.name}</div>
-                      {r.client.company && <div className="text-xs text-text-muted">{r.client.company}</div>}
-                    </TD>
-                    <TD className="text-right font-mono">{r.items.reduce((s, x) => s + x.quantity, 0)}</TD>
-                    <TD className="text-right font-mono text-accent">{formatUSD(r.totalUSD)}</TD>
-                    <TD><StatusBadge status={r.status} /></TD>
-                    <TD className="text-xs text-text-muted">{formatRelative(r.createdAt)}</TD>
-                  </TR>
-                ))}
+                {requests.map((r) => {
+                  const outstanding = Math.max(0, r.totalUSD - r.paidUSD)
+                  return (
+                    <TR key={r.id}>
+                      <TD className="font-mono text-sm">
+                        <Link href={`/seller/pedidos/${r.id}`} className="hover:text-accent">
+                          {r.code || r.id.slice(0, 8)}
+                        </Link>
+                      </TD>
+                      <TD>
+                        <div className="text-sm">{r.client.name}</div>
+                        {r.client.company && <div className="text-xs text-text-muted">{r.client.company}</div>}
+                      </TD>
+                      <TD className="text-right font-mono">{r.items.reduce((s, x) => s + x.quantity, 0)}</TD>
+                      <TD className="text-right font-mono text-accent">{formatUSD(r.totalUSD)}</TD>
+                      <TD className={`text-right font-mono ${outstanding > 0 ? 'text-warning' : 'text-text-muted'}`}>
+                        {formatUSD(outstanding)}
+                      </TD>
+                      <TD><StatusBadge status={r.status} /></TD>
+                      <TD className="text-xs text-text-muted">{formatRelative(r.createdAt)}</TD>
+                      <TD className="text-right">
+                        <Link
+                          href={`/seller/pedidos/${r.id}`}
+                          className="text-xs text-accent hover:underline inline-flex items-center gap-1"
+                        >
+                          Ver <ArrowRight size={12} />
+                        </Link>
+                      </TD>
+                    </TR>
+                  )
+                })}
               </TBody>
             </Table>
           )}
