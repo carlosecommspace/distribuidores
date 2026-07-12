@@ -513,6 +513,20 @@ model ExchangeRateLog {
   @@index([currency, createdAt])
 }
 
+// Tasa oficial vigente gestionada por el superadmin. Singleton — usamos
+// siempre el mismo id "singleton". Los merchants la consumen (a traves del
+// cron que sincroniza Settings) pero no pueden editarla.
+model GlobalExchangeRate {
+  id            String   @id @default("singleton")
+  usdRate       Float    @default(0)
+  eurRate       Float    @default(0)
+  source        String   @default("manual") // bcv | manual | open.er-api
+  usdUpdatedAt  DateTime?
+  eurUpdatedAt  DateTime?
+  updatedById   String?
+  updatedAt     DateTime @updatedAt
+}
+
 model QuickReply {
   id        String   @id @default(cuid())
   userId    String

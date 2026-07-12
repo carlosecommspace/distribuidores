@@ -20,6 +20,27 @@ async function runOnce() {
     })
   }
 
+  // Actualizar GlobalExchangeRate (singleton gestionado por el superadmin).
+  // El fan-out a Settings de cada merchant sigue funcionando abajo para no
+  // romper los consumers que leen Settings.
+  const now = new Date()
+  const globalUpdate: Record<string, unknown> = { source: usdRate.source || eurRate.source }
+  if (usdRate.rate > 0) {
+    globalUpdate.usdRate = usdRate.rate
+    globalUpdate.usdUpdatedAt = now
+  }
+  if (eurRate.rate > 0) {
+    globalUpdate.eurRate = eurRate.rate
+    globalUpdate.eurUpdatedAt = now
+  }
+  if (Object.keys(globalUpdate).length > 1) {
+    await prisma.globalExchangeRate.upsert({
+      where: { id: 'singleton' },
+      update: globalUpdate,
+      create: { id: 'singleton', ...globalUpdate },
+    })
+  }
+
   const settingsList = await prisma.settings.findMany({
     where: { OR: [{ autoUpdateRate: true }, { autoUpdateEurRate: true }] },
   })

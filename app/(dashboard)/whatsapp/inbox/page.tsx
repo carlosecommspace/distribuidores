@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/ui/Toast'
 import { formatRelative, cn } from '@/lib/utils'
-import { ArrowLeft, Send, Search, MessageCircle, Bot, Sparkles } from 'lucide-react'
+import { ArrowLeft, Send, Search, MessageCircle, Bot, Sparkles, MessageSquareQuote, X } from 'lucide-react'
 
 interface ContactPreview {
   id: string
@@ -38,6 +38,12 @@ interface ContactDetail extends ContactPreview {
   messages: WAMessage[]
 }
 
+interface FaqReply {
+  id: string
+  trigger: string
+  reply: string
+}
+
 export default function InboxPage() {
   const searchParams = useSearchParams()
   const initialContactId = searchParams.get('contact')
@@ -49,7 +55,11 @@ export default function InboxPage() {
   const [q, setQ] = useState('')
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const [faqs, setFaqs] = useState<FaqReply[]>([])
+  const [faqOpen, setFaqOpen] = useState(false)
+  const [faqQuery, setFaqQuery] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const loadContacts = async () => {
     const r = await fetch('/api/whatsapp/conversations')
@@ -76,6 +86,9 @@ export default function InboxPage() {
     // Cargar toggle global de IA
     fetch('/api/settings').then((r) => r.json()).then((d) => {
       setGlobalAi(!!d?.settings?.waAiEnabled)
+    }).catch(() => {})
+    fetch('/api/whatsapp/replies').then((r) => r.json()).then((d) => {
+      setFaqs(d?.replies || [])
     }).catch(() => {})
     const t = setInterval(loadContacts, 8000)
     return () => clearInterval(t)
@@ -134,6 +147,37 @@ export default function InboxPage() {
     toast.success(v ? 'IA activada para este chat' : 'IA desactivada')
     loadContacts()
   }
+
+  const insertFaq = (reply: string) => {
+    setDraft((d) => (d.trim() ? `${d}\n${reply}` : reply))
+    setFaqOpen(false)
+    setFaqQuery('')
+    setTimeout(() => textareaRef.current?.focus(), 50)
+  }
+
+  const sendFaq = async (reply: string) => {
+    if (!selected) return
+    setFaqOpen(false)
+    setFaqQuery('')
+    setSending(true)
+    const r = await fetch('/api/whatsapp/send', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ contactId: selected.id, content: reply }),
+    })
+    setSending(false)
+    if (!r.ok) {
+      toast.error('Error enviando')
+      return
+    }
+    loadContact(selected.id)
+  }
+
+  const filteredFaqs = faqs.filter((f) => {
+    if (!faqQuery.trim()) return true
+    const s = faqQuery.toLowerCase()
+    return f.trigger.toLowerCase().includes(s) || f.reply.toLowerCase().includes(s)
+  })
 
   const send = async () => {
     if (!selected || !draft.trim()) return
@@ -296,23 +340,107 @@ export default function InboxPage() {
                   ))
                 )}
               </div>
-              <div className="p-3 border-t border-border flex items-end gap-2">
-                <textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      send()
-                    }
-                  }}
-                  placeholder="Escribe un mensaje..."
-                  className="input-base flex-1 resize-none min-h-[40px] max-h-[120px]"
-                  rows={1}
-                />
-                <Button loading={sending} onClick={send} disabled={!draft.trim()}>
-                  <Send size={14} />
-                </Button>
+              <div className="p-3 border-t border-border">
+                {faqOpen && (
+                  <div className="mb-2 border border-border rounded-md bg-surface-2 overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-surface">
+                      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-text-secondary">
+                        <MessageSquareQuote size={12} /> Respuestas rápidas
+                      </div>
+                      <button
+                        onClick={() => setFaqOpen(false)}
+                        className="text-text-muted hover:text-text-primary"
+                        aria-label="Cerrar"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="p-2 border-b border-border">
+                      <div className="relative">
+                        <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+                        <input
+                          autoFocus
+                          value={faqQuery}
+                          onChange={(e) => setFaqQuery(e.target.value)}
+                          placeholder="Buscar por trigger o texto..."
+                          className="input-base pl-7 text-xs py-1.5"
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {filteredFaqs.length === 0 ? (
+                        <div className="text-xs text-text-muted text-center py-6 px-3">
+                          {faqs.length === 0 ? (
+                            <>
+                              No hay respuestas rápidas configuradas.{' '}
+                              <Link href="/whatsapp" className="text-accent hover:underline">Crearlas →</Link>
+                            </>
+                          ) : (
+                            'Sin coincidencias'
+                          )}
+                        </div>
+                      ) : (
+                        <ul className="divide-y divide-border">
+                          {filteredFaqs.map((f) => (
+                            <li key={f.id} className="p-2 hover:bg-surface flex items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium text-text-primary truncate">{f.trigger}</div>
+                                <div className="text-xs text-text-muted line-clamp-2 whitespace-pre-wrap">{f.reply}</div>
+                              </div>
+                              <div className="flex flex-col gap-1 flex-shrink-0">
+                                <button
+                                  onClick={() => insertFaq(f.reply)}
+                                  className="text-[10px] px-2 py-0.5 rounded border border-border hover:bg-surface-2 text-text-secondary"
+                                  title="Insertar en el borrador"
+                                >
+                                  Insertar
+                                </button>
+                                <button
+                                  onClick={() => sendFaq(f.reply)}
+                                  className="text-[10px] px-2 py-0.5 rounded bg-accent text-black font-medium"
+                                  title="Enviar tal cual"
+                                >
+                                  Enviar
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-end gap-2">
+                  <button
+                    onClick={() => setFaqOpen((v) => !v)}
+                    className={cn(
+                      'p-2 rounded-md border border-border hover:bg-surface-2 text-text-secondary',
+                      faqOpen && 'bg-accent-subtle border-accent-border text-accent',
+                    )}
+                    title="Insertar respuesta rápida"
+                    aria-label="Insertar respuesta rápida"
+                  >
+                    <MessageSquareQuote size={14} />
+                  </button>
+                  <textarea
+                    ref={textareaRef}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        send()
+                      }
+                    }}
+                    placeholder="Escribe un mensaje..."
+                    className="input-base flex-1 resize-none min-h-[40px] max-h-[120px]"
+                    rows={1}
+                  />
+                  <Button loading={sending} onClick={send} disabled={!draft.trim()}>
+                    <Send size={14} />
+                  </Button>
+                </div>
               </div>
             </>
           )}

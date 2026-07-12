@@ -33,12 +33,25 @@ const COLORS = ['#F5A623', '#60A5FA', '#4ADE80', '#F87171', '#A78BFA', '#FBBF24'
 
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState('30d')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [data, setData] = useState<AnalyticsData | null>(null)
 
+  const query =
+    period === 'custom' && customFrom
+      ? `from=${customFrom}${customTo ? `&to=${customTo}` : ''}`
+      : `period=${period}`
+
   useEffect(() => {
+    if (period === 'custom' && !customFrom) return
     setData(null)
-    fetch(`/api/analytics?period=${period}`).then((r) => r.json()).then(setData)
-  }, [period])
+    fetch(`/api/analytics?${query}`).then((r) => r.json()).then(setData)
+  }, [query, period, customFrom])
+
+  const insightsArgs =
+    period === 'custom' && customFrom
+      ? { from: customFrom, to: customTo || undefined }
+      : { period }
 
   return (
     <div>
@@ -46,26 +59,51 @@ export default function AnalyticsPage() {
         title="Analytics"
         subtitle="Métricas clave de tu operación"
         actions={
-          <div className="flex items-center gap-1 p-1 bg-surface-2 border border-border rounded-md overflow-x-auto">
-            {[
-              { v: 'today', l: 'Hoy' },
-              { v: '7d', l: '7 días' },
-              { v: '30d', l: '30 días' },
-              { v: '90d', l: '90 días' },
-            ].map((p) => (
-              <button
-                key={p.v}
-                onClick={() => setPeriod(p.v)}
-                className={cn('px-3 py-1.5 text-xs rounded whitespace-nowrap', period === p.v ? 'bg-accent text-black' : 'text-text-secondary hover:text-text-primary')}
-              >
-                {p.l}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 p-1 bg-surface-2 border border-border rounded-md overflow-x-auto">
+              {[
+                { v: 'today', l: 'Hoy' },
+                { v: '7d', l: '7 días' },
+                { v: '30d', l: '30 días' },
+                { v: '90d', l: '90 días' },
+                { v: 'ytd', l: 'YTD' },
+                { v: 'custom', l: 'Personalizado' },
+              ].map((p) => (
+                <button
+                  key={p.v}
+                  onClick={() => setPeriod(p.v)}
+                  className={cn('px-3 py-1.5 text-xs rounded whitespace-nowrap', period === p.v ? 'bg-accent text-black' : 'text-text-secondary hover:text-text-primary')}
+                >
+                  {p.l}
+                </button>
+              ))}
+            </div>
+            {period === 'custom' && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="input-base py-1 px-2 text-xs max-w-[140px]"
+                />
+                <span className="text-text-muted">→</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="input-base py-1 px-2 text-xs max-w-[140px]"
+                />
+              </div>
+            )}
           </div>
         }
       />
 
-      {!data ? (
+      {period === 'custom' && !customFrom ? (
+        <div className="bg-surface border border-border rounded-md p-6 text-center text-sm text-text-muted">
+          Elegí una fecha de inicio para ver el reporte.
+        </div>
+      ) : !data ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
@@ -78,7 +116,7 @@ export default function AnalyticsPage() {
             <Stat label="Ticket promedio" value={formatUSD(data.avgTicket)} />
           </div>
 
-          <AiInsights period={period} />
+          <AiInsights {...insightsArgs} />
 
           <Card className="mb-6">
             <CardHeader><CardTitle>Ventas diarias</CardTitle></CardHeader>

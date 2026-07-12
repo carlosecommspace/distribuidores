@@ -12,7 +12,7 @@ import { StockBadge, MLStatusBadge } from '@/components/inventory/StockBadge'
 import { ProductForm, emptyProduct, type ProductFormValues } from '@/components/inventory/ProductForm'
 import { formatUSD, formatBs, formatNumber } from '@/lib/utils'
 import { toast } from '@/components/ui/Toast'
-import { Plus, Search, Package, Pencil, Upload, Download } from 'lucide-react'
+import { Plus, Search, Package, Pencil, Upload, Download, ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 import { ImportProductsModal } from '@/components/inventory/ImportProductsModal'
 import { PublishToMLModal } from '@/components/ml/PublishToMLModal'
@@ -27,6 +27,7 @@ interface Product {
   stockMin: number
   priceUSD: number
   priceBs: number
+  images?: string[]
   mlItemId?: string | null
   mlStatus?: string | null
   isActive: boolean
@@ -224,6 +225,7 @@ export default function InventoryPage() {
                         }}
                       />
                     </TH>
+                    <TH className="w-14"></TH>
                     <TH>SKU</TH>
                     <TH>Producto</TH>
                     <TH className="text-right">Stock</TH>
@@ -251,6 +253,9 @@ export default function InventoryPage() {
                           }}
                           aria-label={`Seleccionar ${p.name}`}
                         />
+                      </TD>
+                      <TD>
+                        <ProductThumb src={p.images?.[0]} name={p.name} />
                       </TD>
                       <TD className="font-mono text-xs text-text-secondary">{p.sku}</TD>
                       <TD>
@@ -304,6 +309,30 @@ export default function InventoryPage() {
           .map((p) => ({ id: p.id, name: p.name, sku: p.sku, priceUSD: p.priceUSD, stock: p.stock, mlItemId: p.mlItemId }))}
         onDone={() => { setSelectedIds(new Set()); load() }}
       />
+    </div>
+  )
+}
+
+function ProductThumb({ src, name }: { src?: string; name: string }) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={name}
+        className="h-10 w-10 rounded-md object-cover border border-border bg-surface-2"
+        loading="lazy"
+        onError={(e) => {
+          const el = e.currentTarget
+          el.style.display = 'none'
+          el.nextElementSibling?.classList.remove('hidden')
+        }}
+      />
+    )
+  }
+  return (
+    <div className="h-10 w-10 rounded-md border border-border bg-surface-2 flex items-center justify-center text-text-muted">
+      <ImageIcon size={16} />
     </div>
   )
 }

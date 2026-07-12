@@ -17,6 +17,7 @@ import {
   Globe,
   Mail,
   BadgeCheck,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/brand/Logo'
@@ -35,6 +36,7 @@ const nav = [
   { href: '/site', label: 'Sitio web', icon: Globe },
   { href: '/leads', label: 'Leads', icon: Mail },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/reports', label: 'Reportes', icon: FileText },
   { href: '/settings', label: 'Configuración', icon: Settings },
 ]
 

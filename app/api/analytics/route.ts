@@ -8,17 +8,38 @@ export async function GET(req: Request) {
   const userId = (session.user as { id: string }).id
   const { searchParams } = new URL(req.url)
   const period = searchParams.get('period') || '30d'
+  const fromParam = searchParams.get('from')
+  const toParam = searchParams.get('to')
 
   const now = new Date()
-  const from = new Date()
-  if (period === 'today') from.setHours(0, 0, 0, 0)
+  let from = new Date()
+  let to: Date | null = null
+
+  if (fromParam) {
+    const parsed = new Date(fromParam)
+    if (!isNaN(parsed.getTime())) from = parsed
+  } else if (period === 'today') from.setHours(0, 0, 0, 0)
   else if (period === '7d') from.setDate(now.getDate() - 7)
   else if (period === '30d') from.setDate(now.getDate() - 30)
   else if (period === '90d') from.setDate(now.getDate() - 90)
+  else if (period === 'ytd') { from = new Date(now.getFullYear(), 0, 1) }
   else from.setDate(now.getDate() - 30)
 
+  if (toParam) {
+    const parsed = new Date(toParam)
+    if (!isNaN(parsed.getTime())) {
+      to = parsed
+      to.setHours(23, 59, 59, 999)
+    }
+  }
+
   const sales = await prisma.sale.findMany({
-    where: { userId, createdAt: { gte: from } },
+    where: {
+      userId,
+      createdAt: to
+        ? { gte: from, lte: to }
+        : { gte: from },
+    },
     include: { items: { include: { product: true } }, client: true },
   })
 

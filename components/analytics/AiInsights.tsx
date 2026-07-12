@@ -25,7 +25,9 @@ interface Response {
 }
 
 interface Props {
-  period: string
+  period?: string
+  from?: string
+  to?: string
 }
 
 const TYPE_META: Record<Insight['type'], { icon: React.ElementType; label: string; className: string; iconClass: string }> = {
@@ -55,17 +57,24 @@ const TYPE_META: Record<Insight['type'], { icon: React.ElementType; label: strin
   },
 }
 
-export function AiInsights({ period }: Props) {
+export function AiInsights({ period, from, to }: Props) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<Response | null>(null)
 
   const generate = async () => {
     setLoading(true)
     try {
+      const payload: Record<string, unknown> = {}
+      if (from) {
+        payload.from = from
+        if (to) payload.to = to
+      } else {
+        payload.period = period
+      }
       const r = await fetch('/api/analytics/insights', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ period }),
+        body: JSON.stringify(payload),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) {

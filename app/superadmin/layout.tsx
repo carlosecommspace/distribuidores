@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard } from 'lucide-react'
+import { LayoutDashboard, DollarSign } from 'lucide-react'
 import { ToastViewport } from '@/components/ui/Toast'
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { Logo } from '@/components/brand/Logo'
@@ -35,6 +35,12 @@ export default async function SuperadminLayout({ children }: { children: React.R
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-text-secondary hover:text-text-primary hover:bg-surface-2"
             >
               <LayoutDashboard size={14} /> Merchants
+            </Link>
+            <Link
+              href="/superadmin/exchange-rate"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-text-secondary hover:text-text-primary hover:bg-surface-2"
+            >
+              <DollarSign size={14} /> Tasa cambio
             </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3">
