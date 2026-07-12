@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { toast } from '@/components/ui/Toast'
 import { BadgeCheck } from 'lucide-react'
+import { Logo } from '@/components/brand/Logo'
 
 export default function VendedorLoginPage() {
   const [email, setEmail] = useState('')
@@ -36,11 +37,14 @@ export default function VendedorLoginPage() {
         <div className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-accent mb-3">
           <BadgeCheck size={14} /> Portal del vendedor
         </div>
-        <div className="inline-flex items-baseline gap-1.5">
-          <span className="font-display font-bold text-3xl text-text-primary">Distrib</span>
-          <span className="font-display font-bold text-3xl text-accent">OS</span>
+        <div className="inline-flex items-center gap-3">
+          <Logo size={44} />
+          <span className="font-display font-bold text-3xl leading-none">
+            <span className="text-text-primary">Distrib</span>
+            <span className="text-accent">OS</span>
+          </span>
         </div>
-        <p className="text-sm text-text-secondary mt-2">Ingresa con las credenciales que te dio tu administrador</p>
+        <p className="text-sm text-text-secondary mt-3">Ingresa con las credenciales que te dio tu administrador</p>
       </div>
 
       <form onSubmit={onSubmit} className="bg-surface border border-border rounded-lg p-7 flex flex-col gap-4">
